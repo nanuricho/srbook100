@@ -12,6 +12,7 @@ import { CertificateModal } from './components/CertificateModal';
 import { SettingsModal } from './components/SettingsModal';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { StudentLookupView } from './components/StudentLookupView';
+import { QuickRecordHero } from './components/QuickRecordHero';
 import {
   loadStudentsFromStorage,
   saveStudentsToStorage,
@@ -214,6 +215,30 @@ export default function App() {
         : `[${activeStudent.name}] No.${num} 도서를 미독으로 변경했습니다.`,
       nextStatus === 'COMPLETED' ? 'success' : 'info'
     );
+  };
+
+  // Save detail record for specific student (e.g. from hero component)
+  const handleSaveRecordForStudent = (studentId: string, record: ReadingRecord) => {
+    const targetStudent = students.find((s) => s.id === studentId);
+    const targetName = targetStudent ? targetStudent.name : '학생';
+
+    const updatedStudents = students.map((s) => {
+      if (s.id === studentId) {
+        const currentRecords = s.records || {};
+        return {
+          ...s,
+          records: {
+            ...currentRecords,
+            [record.num]: record,
+          },
+          updatedAt: new Date().toISOString(),
+        };
+      }
+      return s;
+    });
+
+    handleUpdateStudentsList(updatedStudents);
+    showToast(`'${targetName}' 학생의 No.${record.num} 도서 감상 기록이 저장되었습니다! 📝`, 'success');
   };
 
   // Save detail record from modal
@@ -451,6 +476,16 @@ export default function App() {
         {/* TAB 1: 100 BOOKS EXPLORATION & RECORDING */}
         {activeTab === 'BOOKS' && (
           <main className="space-y-6">
+            {/* Real-time Student Quick Review & Star Rating Form Hero */}
+            <QuickRecordHero
+              books={books}
+              students={students}
+              activeStudent={activeStudent}
+              onSelectStudent={handleSelectStudent}
+              onRegisterStudent={handleRegisterNewStudent}
+              onSaveRecord={handleSaveRecordForStudent}
+            />
+
             {/* Reading Statistics Overview */}
             <StatsOverview books={books} records={records} />
 

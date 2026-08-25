@@ -4,6 +4,7 @@ import {
   parseBatchStudentInput,
   createStudentId,
   exportStudentsRosterCSV,
+  exportReviewsDetailedCSV,
   generateStudentTemplateCSV,
   getCompletedCount,
   getInProgressCount,
@@ -348,7 +349,7 @@ export function TeacherDashboard({
     }
   };
 
-  // Export CSV Report
+  // Export CSV Report - Student Roster
   const handleDownloadCSV = () => {
     const csvContent = exportStudentsRosterCSV(filteredStudents, books.length || 100);
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -356,6 +357,18 @@ export function TeacherDashboard({
     const link = document.createElement('a');
     link.href = url;
     link.download = `서룡초_학급독서현황_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Export Detailed Book Reviews and Ratings CSV Report for teachers
+  const handleDownloadReviewsCSV = () => {
+    const csvContent = exportReviewsDetailedCSV(students, books);
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `서룡초_학생_독서감상기록및별점_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -427,12 +440,22 @@ export function TeacherDashboard({
             </button>
 
             <button
+              onClick={handleDownloadReviewsCSV}
+              disabled={students.length === 0 || overallStats.totalReviews === 0}
+              className="px-4 py-2.5 rounded-2xl text-xs font-bold bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-indigo-950 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-xs font-black"
+              title="전체 학생들의 별점 및 감상평, 인상깊은 문장이 기록된 시트 CSV 다운로드"
+            >
+              <Quote className="w-4 h-4" />
+              <span>감상평 시트 CSV 다운로드</span>
+            </button>
+
+            <button
               onClick={handleDownloadCSV}
               disabled={students.length === 0}
               className="px-4 py-2.5 rounded-2xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
             >
               <Download className="w-4 h-4" />
-              <span>현황 CSV 다운로드</span>
+              <span>진도표 CSV 다운로드</span>
             </button>
           </div>
         </div>

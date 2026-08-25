@@ -1,4 +1,4 @@
-import { Student, ReadingRecord } from '../types';
+import { Book, Student, ReadingRecord } from '../types';
 import { getCurrentBadge } from './badges';
 
 export const STORAGE_KEY_STUDENTS = 'seoryong_students_v2';
@@ -417,6 +417,66 @@ export function exportStudentsRosterCSV(students: Student[], totalBooks = 100): 
       `"${badge}"`,
       `"${lastDate}"`,
     ].join(',');
+  });
+
+  return [headers.join(','), ...rows].join('\r\n');
+}
+
+/**
+ * Export all detailed student book reviews and ratings to CSV
+ */
+export function exportReviewsDetailedCSV(students: Student[], books: Book[]): string {
+  const bookMap = new Map<string, Book>();
+  books.forEach((b) => bookMap.set(b.num, b));
+
+  const headers = [
+    '학년',
+    '반',
+    '번호',
+    '학생이름',
+    '도서번호',
+    '도서명',
+    '저자',
+    '권장학년',
+    '독서상태',
+    '별점',
+    '간단감상평(느낀점)',
+    '인상깊은한줄(구절)',
+    '완독일자',
+    '기록일시',
+  ];
+
+  const rows: string[] = [];
+
+  students.forEach((s) => {
+    const studentRecords = s.records || {};
+    Object.values(studentRecords).forEach((rec) => {
+      const book = bookMap.get(rec.num);
+      const statusLabel =
+        rec.status === 'COMPLETED' ? '완독 완료' : rec.status === 'IN_PROGRESS' ? '읽는 중' : '읽기 전';
+      const ratingText = rec.rating ? `${rec.rating}점` : '';
+      const reviewText = (rec.review || '').replace(/"/g, '""');
+      const quoteText = (rec.quote || '').replace(/"/g, '""');
+
+      rows.push(
+        [
+          `"${s.grade}"`,
+          `"${s.className}"`,
+          `"${s.studentNumber || ''}"`,
+          `"${s.name}"`,
+          `"${rec.num}"`,
+          `"${(book?.title || `도서 #${rec.num}`).replace(/"/g, '""')}"`,
+          `"${(book?.author || '').replace(/"/g, '""')}"`,
+          `"${book?.grade || ''}"`,
+          `"${statusLabel}"`,
+          `"${ratingText}"`,
+          `"${reviewText}"`,
+          `"${quoteText}"`,
+          `"${rec.completedDate || ''}"`,
+          `"${rec.updatedAt ? rec.updatedAt.split('T')[0] : ''}"`,
+        ].join(',')
+      );
+    });
   });
 
   return [headers.join(','), ...rows].join('\r\n');
