@@ -54,7 +54,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({ books, records }) 
   }
 
   return (
-    <div className="bg-white rounded-3xl shadow-card border border-slate-100 p-5 md:p-6 mb-6">
+    <div className="bg-white rounded-3xl shadow-card border border-slate-100 p-5 md:p-6 mb-6 notranslate" translate="no">
       {/* Top Main Cards Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
         {/* Total Books */}
@@ -126,7 +126,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({ books, records }) 
 
           <div>
             <div className="flex items-center justify-between text-xs text-indigo-200 mb-2">
-              <span className="font-semibold uppercase tracking-wider">다음 달성 뱃지</span>
+              <span className="font-semibold uppercase tracking-wider">다음 달성 목표</span>
               {nextBadge && (
                 <span>{completedCount} / {nextBadge.requiredCount}권</span>
               )}

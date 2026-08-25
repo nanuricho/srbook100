@@ -19,7 +19,7 @@ interface FilterControlsProps {
 }
 
 const GRADES: { label: string; value: GradeFilter }[] = [
-  { label: '전체 학년', value: 'ALL' },
+  { label: '전체학년', value: 'ALL' },
   { label: '1학년', value: '1학년' },
   { label: '2학년', value: '2학년' },
   { label: '3학년', value: '3학년' },
@@ -55,7 +55,7 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
     searchQuery.trim() !== '' || selectedGrade !== 'ALL' || selectedStatus !== 'ALL';
 
   return (
-    <div className="bg-white rounded-3xl shadow-card border border-slate-100 p-4 md:p-5 mb-6 space-y-4">
+    <div className="bg-white rounded-3xl shadow-card border border-slate-100 p-4 md:p-5 mb-6 space-y-4 notranslate" translate="no">
       {/* Top Search & Layout Controls Row */}
       <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
         {/* Search Bar */}

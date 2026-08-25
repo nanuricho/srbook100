@@ -387,7 +387,7 @@ export function TeacherDashboard({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 notranslate" translate="no">
       {/* Top Banner / Navigation for Teacher */}
       <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-blue-900 text-white rounded-3xl p-6 md:p-8 shadow-vibrant relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl pointer-events-none" />
@@ -1086,7 +1086,7 @@ export function TeacherDashboard({
                     <th className="p-3.5">학생 이름</th>
                     <th className="p-3.5">완독 진도 (100선)</th>
                     <th className="p-3.5 text-center">완독</th>
-                    <th className="p-3.5 text-center">읽는중</th>
+                    <th className="p-3.5 text-center">읽는 중</th>
                     <th className="p-3.5">칭호</th>
                     <th className="p-3.5 text-right">관리 & 삭제</th>
                   </tr>

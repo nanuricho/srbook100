@@ -158,7 +158,7 @@ export function StudentLookupView({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 notranslate" translate="no">
       {/* Top Banner */}
       <div className="bg-gradient-to-r from-indigo-600 via-indigo-700 to-blue-600 text-white rounded-3xl p-6 md:p-8 shadow-vibrant relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none" />
