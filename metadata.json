@@ -1,0 +1,6 @@
+{
+  "name": "서룡초 필독도서 100선",
+  "description": "서룡초등학교 필독도서 100선 전자 독서 기록장 (Google Sheet CSV 연동, 학년별 필터, 상세 독서록, 통계 및 완독 뱃지)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
