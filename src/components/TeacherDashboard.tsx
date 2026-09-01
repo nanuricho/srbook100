@@ -573,10 +573,10 @@ export function TeacherDashboard({
                 </button>
               )}
             </div>
-            <h2 className="text-2xl md:text-3xl font-black tracking-tight">
+            <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-black tracking-tight whitespace-nowrap">
               서룡초 독서 지도 & 학생 명단 관리
             </h2>
-            <p className="text-sm text-indigo-200 mt-1 max-w-xl">
+            <p className="text-xs sm:text-sm text-indigo-200 mt-1">
               학생 명단 일괄 업로드 · 개별/다중 명단 삭제 · 100선 완독 진도 및 감상평 점검
             </p>
           </div>
