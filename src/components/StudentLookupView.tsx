@@ -52,6 +52,7 @@ export function StudentLookupView({
   onStudentLogout,
 }: StudentLookupViewProps) {
   const [searchInput, setSearchInput] = useState<string>('');
+  const [confirmedQuery, setConfirmedQuery] = useState<string>('');
   const [selectedStudentId, setSelectedStudentId] = useState<string>(
     currentStudent ? currentStudent.id : ''
   );
@@ -67,51 +68,32 @@ export function StudentLookupView({
   useEffect(() => {
     if (currentStudent && !selectedStudentId) {
       setSelectedStudentId(currentStudent.id);
+      setConfirmedQuery(currentStudent.name);
     }
   }, [currentStudent]);
 
-  // Search Results: ONLY show matches for what the user typed
+  // Search Results: ONLY computed when user confirms/searches with full name
   const searchResults = useMemo(() => {
-    const q = searchInput.trim().toLowerCase();
+    const q = confirmedQuery.trim().toLowerCase();
     if (!q) {
-      // If search input is empty but there's an active/selected student, show only that student
-      if (selectedStudentId) {
-        const found = students.find((s) => s.id === selectedStudentId);
-        return found ? [found] : [];
-      }
-      if (currentStudent) {
-        return [currentStudent];
-      }
       return [];
     }
 
     return students.filter(
       (s) =>
+        s.name.toLowerCase() === q ||
         s.name.toLowerCase().includes(q) ||
-        (s.studentNumber && s.studentNumber.includes(q)) ||
-        s.grade.includes(q) ||
-        s.className.includes(q)
+        (s.studentNumber && s.studentNumber.includes(q))
     );
-  }, [students, searchInput, selectedStudentId, currentStudent]);
+  }, [students, confirmedQuery]);
 
-  // If user searched and there's exactly 1 match, auto-select it
-  useEffect(() => {
-    const q = searchInput.trim();
-    if (q && searchResults.length === 1) {
-      setSelectedStudentId(searchResults[0].id);
-    }
-  }, [searchInput, searchResults]);
-
-  // Active target student to display
+  // Active target student to display (Only when explicitly selected or confirmed)
   const activeStudent = useMemo(() => {
     if (selectedStudentId) {
       return students.find((s) => s.id === selectedStudentId) || null;
     }
-    if (currentStudent) {
-      return currentStudent;
-    }
     return null;
-  }, [students, selectedStudentId, currentStudent]);
+  }, [students, selectedStudentId]);
 
   // Active Student stats
   const studentStats = useMemo(() => {
@@ -196,8 +178,34 @@ export function StudentLookupView({
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchResults.length > 0) {
-      setSelectedStudentId(searchResults[0].id);
+    const query = searchInput.trim();
+    if (!query) {
+      setConfirmedQuery('');
+      setSelectedStudentId('');
+      return;
+    }
+
+    setConfirmedQuery(query);
+
+    // Exact matches
+    const exactMatches = students.filter(
+      (s) => s.name.toLowerCase() === query.toLowerCase()
+    );
+
+    if (exactMatches.length === 1) {
+      setSelectedStudentId(exactMatches[0].id);
+    } else if (exactMatches.length > 1) {
+      setSelectedStudentId('');
+    } else {
+      // Partial matches
+      const partialMatches = students.filter(
+        (s) => s.name.toLowerCase().includes(query.toLowerCase())
+      );
+      if (partialMatches.length === 1) {
+        setSelectedStudentId(partialMatches[0].id);
+      } else {
+        setSelectedStudentId('');
+      }
     }
   };
 
@@ -333,6 +341,8 @@ export function StudentLookupView({
                 type="button"
                 onClick={() => {
                   setSearchInput('');
+                  setConfirmedQuery('');
+                  setSelectedStudentId('');
                 }}
                 className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
               >
@@ -355,6 +365,7 @@ export function StudentLookupView({
                 type="button"
                 onClick={() => {
                   setSelectedStudentId(currentStudent.id);
+                  setConfirmedQuery(currentStudent.name);
                   setSearchInput(currentStudent.name);
                 }}
                 className="flex-1 sm:flex-initial px-4 py-3.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 shadow-2xs"
@@ -367,6 +378,7 @@ export function StudentLookupView({
                   type="button"
                   onClick={() => {
                     setSearchInput('');
+                    setConfirmedQuery('');
                     setSelectedStudentId('');
                     onStudentLogout();
                   }}
@@ -381,11 +393,11 @@ export function StudentLookupView({
           )}
         </form>
 
-        {/* If multiple students match the searched name */}
-        {searchInput.trim() && searchResults.length > 1 && (
+        {/* If multiple students match the confirmed name */}
+        {confirmedQuery.trim() && searchResults.length > 1 && (
           <div className="mt-4 pt-4 border-t border-slate-100">
             <p className="text-xs font-bold text-slate-600 mb-2">
-              '{searchInput.trim()}' 이름으로 {searchResults.length}명의 학생이 검색되었습니다. 본인의 학년/반을 선택해주세요:
+              '{confirmedQuery.trim()}' 이름으로 {searchResults.length}명의 학생이 검색되었습니다. 본인의 학년/반을 선택해주세요:
             </p>
             <div className="flex flex-wrap gap-2">
               {searchResults.map((s) => {
@@ -394,7 +406,9 @@ export function StudentLookupView({
                   <button
                     key={s.id}
                     type="button"
-                    onClick={() => setSelectedStudentId(s.id)}
+                    onClick={() => {
+                      setSelectedStudentId(s.id);
+                    }}
                     className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer border ${
                       isSelected
                         ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
@@ -412,27 +426,27 @@ export function StudentLookupView({
           </div>
         )}
 
-        {/* If 0 students match the searched name */}
-        {searchInput.trim() && searchResults.length === 0 && (
+        {/* If 0 students match the confirmed name */}
+        {confirmedQuery.trim() && searchResults.length === 0 && (
           <div className="mt-4 p-4 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="text-center sm:text-left">
               <p className="text-xs font-bold text-amber-900">
-                '{searchInput.trim()}' 이름으로 등록된 학생 정보가 없습니다.
+                '{confirmedQuery.trim()}' 이름으로 등록된 학생 정보가 없습니다.
               </p>
               <p className="text-[11px] text-amber-700 mt-0.5">
-                오타가 없는지 확인하시거나, 새 학생으로 바로 등록하여 독서 기록을 시작할 수 있습니다.
+                이름을 정확하게 입력하셨는지 확인하시거나, 새 학생으로 바로 등록하여 독서 기록을 시작할 수 있습니다.
               </p>
             </div>
             <button
               type="button"
               onClick={() => {
-                setNewName(searchInput.trim());
+                setNewName(confirmedQuery.trim());
                 setIsRegistering(true);
               }}
               className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 shadow-xs"
             >
               <UserPlus className="w-3.5 h-3.5" />
-              <span>'{searchInput.trim()}' 학생 새로 등록하기</span>
+              <span>'{confirmedQuery.trim()}' 학생 새로 등록하기</span>
             </button>
           </div>
         )}
@@ -497,6 +511,7 @@ export function StudentLookupView({
                 type="button"
                 onClick={() => {
                   setSearchInput('');
+                  setConfirmedQuery('');
                   setSelectedStudentId('');
                   onStudentLogout?.();
                 }}
@@ -517,6 +532,8 @@ export function StudentLookupView({
                     ) {
                       onDeleteStudent(activeStudent.id, activeStudent.name);
                       setSelectedStudentId('');
+                      setConfirmedQuery('');
+                      setSearchInput('');
                     }
                   }}
                   title="학생 명단 및 기록 삭제"
