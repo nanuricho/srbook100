@@ -28,6 +28,8 @@ import {
   DEFAULT_GAS_WEBAPP_URL,
   getGoogleScriptUrl,
   saveGoogleScriptUrl,
+  sendRecordToGoogleSheet,
+  getFormattedNow,
 } from './utils/googleAppsScriptSync';
 import { BookOpen, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 
@@ -246,9 +248,27 @@ export default function App() {
         : `[${activeStudent.name}] No.${num} 도서를 미독으로 변경했습니다.`,
       nextStatus === 'COMPLETED' ? 'success' : 'info'
     );
+
+    // Auto sync to Google Sheets in background
+    if (nextStatus === 'COMPLETED' && activeStudent) {
+      sendRecordToGoogleSheet({
+        studentName: activeStudent.name,
+        grade: activeStudent.grade || '3학년',
+        className: activeStudent.className || '1반',
+        studentNumber: activeStudent.studentNumber || '',
+        bookNum: num,
+        bookTitle: targetBook?.title || `도서 #${num}`,
+        author: targetBook?.author || '',
+        publisher: targetBook?.publisher || '',
+        bookGrade: targetBook?.grade || '',
+        status: 'COMPLETED',
+        completedDate: new Date().toISOString().split('T')[0],
+        timestamp: getFormattedNow(),
+      }).catch((e) => console.debug('Toggle sync to GAS', e));
+    }
   };
 
-  // Save detail record for specific student (e.g. from hero component)
+  // Save detail record for specific student (e.g. from hero component or modal)
   const handleSaveRecordForStudent = (studentId: string, record: ReadingRecord) => {
     const targetStudent = students.find((s) => s.id === studentId);
     const targetName = targetStudent ? targetStudent.name : '학생';
@@ -270,6 +290,28 @@ export default function App() {
 
     handleUpdateStudentsList(updatedStudents);
     showToast(`'${targetName}' 학생의 No.${record.num} 도서 감상 기록이 저장되었습니다! 📝`, 'success');
+
+    // Auto sync to Google Sheets in background
+    if (targetStudent) {
+      const book = books.find((b) => b.num === record.num);
+      sendRecordToGoogleSheet({
+        studentName: targetStudent.name,
+        grade: targetStudent.grade || '3학년',
+        className: targetStudent.className || '1반',
+        studentNumber: targetStudent.studentNumber || '',
+        bookNum: record.num,
+        bookTitle: book?.title || `도서 #${record.num}`,
+        author: book?.author || '',
+        publisher: book?.publisher || '',
+        bookGrade: book?.grade || '',
+        status: record.status,
+        rating: record.rating,
+        review: record.review,
+        quote: record.quote,
+        completedDate: record.completedDate,
+        timestamp: record.updatedAt || getFormattedNow(),
+      }).catch((e) => console.debug('Background GAS sync', e));
+    }
   };
 
   // Save detail record from modal

@@ -52,6 +52,7 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
     record?.completedDate || new Date().toISOString().split('T')[0]
   );
   const [review, setReview] = useState<string>(record?.review || '');
+  const [quote, setQuote] = useState<string>(record?.quote || '');
 
   useEffect(() => {
     if (activeStudent) {
@@ -67,18 +68,20 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
         setRating(existingRec.rating || 5);
         setCompletedDate(existingRec.completedDate || new Date().toISOString().split('T')[0]);
         setReview(existingRec.review || '');
+        setQuote(existingRec.quote || '');
       } else {
         setStatus('COMPLETED');
         setRating(5);
         setCompletedDate(new Date().toISOString().split('T')[0]);
         setReview('');
+        setQuote('');
       }
     } else {
-      setStudentName('');
       setStatus('COMPLETED');
       setRating(5);
       setCompletedDate(new Date().toISOString().split('T')[0]);
       setReview('');
+      setQuote('');
     }
   }, [book, activeStudent]);
 
@@ -91,6 +94,8 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
       return;
     }
 
+    const normNumber = studentNumber.includes('번') ? studentNumber : `${studentNumber}번`;
+
     // Resolve or register student
     let targetStudent = students.find(
       (s) => s.name === trimmedName && s.grade === studentGrade && s.className === studentClass
@@ -102,35 +107,45 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
 
     let targetStudentId = targetStudent ? targetStudent.id : '';
 
-    if (!targetStudent) {
-      const newId = `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(-4)}`;
-      const newSt: Student = {
-        id: newId,
-        grade: studentGrade,
-        className: studentClass,
-        studentNumber: studentNumber,
-        name: trimmedName,
-        records: {},
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      onRegisterStudent(newSt);
-      targetStudentId = newId;
-    } else {
-      onSelectStudent(targetStudent);
-      targetStudentId = targetStudent.id;
-    }
-
     const updatedRecord: ReadingRecord = {
       num: book.num,
       status,
       rating: rating > 0 ? rating : undefined,
       completedDate: status === 'COMPLETED' ? completedDate : undefined,
       review: review.trim() || undefined,
+      quote: quote.trim() || undefined,
       updatedAt: new Date().toISOString(),
     };
 
-    onSaveRecordForStudent(targetStudentId, updatedRecord);
+    if (!targetStudent) {
+      const newId = `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(-4)}`;
+      const newSt: Student = {
+        id: newId,
+        grade: studentGrade,
+        className: studentClass,
+        studentNumber: normNumber,
+        name: trimmedName,
+        records: {
+          [book.num]: updatedRecord,
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      onRegisterStudent(newSt);
+      targetStudentId = newId;
+    } else {
+      // Update existing student with possibly updated number
+      const updatedExisting: Student = {
+        ...targetStudent,
+        grade: studentGrade,
+        className: studentClass,
+        studentNumber: normNumber || targetStudent.studentNumber,
+      };
+      onSelectStudent(updatedExisting);
+      targetStudentId = targetStudent.id;
+      onSaveRecordForStudent(targetStudentId, updatedRecord);
+    }
+
     onClose();
   };
 
@@ -180,19 +195,20 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
             <div className="flex items-center justify-between">
               <label className="text-xs font-black text-indigo-900 flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5 text-indigo-600" />
-                <span>독서 기록 학생</span>
+                <span>독서 기록 학생 (학년 / 반 / 번호 / 이름)</span>
               </label>
-              <span className="text-[10px] font-bold text-indigo-500">
-                {activeStudent ? '접속 중' : '이름을 입력하세요'}
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-700">
+                {activeStudent ? `현재: ${activeStudent.name}` : '직접 입력 시 자동 저장'}
               </span>
             </div>
 
-            <div className="grid grid-cols-12 gap-2">
-              <div className="col-span-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-500 mb-0.5">학년</label>
                 <select
                   value={studentGrade}
                   onChange={(e) => setStudentGrade(e.target.value)}
-                  className="w-full px-2 py-2 bg-white border border-indigo-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-hidden focus:border-indigo-600"
+                  className="w-full px-2 py-2 bg-white border border-indigo-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-hidden focus:border-indigo-600 shadow-2xs"
                 >
                   {['1학년', '2학년', '3학년', '4학년', '5학년', '6학년'].map((g) => (
                     <option key={g} value={g}>
@@ -202,27 +218,45 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
                 </select>
               </div>
 
-              <div className="col-span-3">
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-500 mb-0.5">반</label>
                 <input
                   type="text"
                   value={studentClass}
                   onChange={(e) => setStudentClass(e.target.value)}
                   placeholder="1반"
-                  className="w-full px-2 py-2 bg-white border border-indigo-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-hidden focus:border-indigo-600"
+                  className="w-full px-2 py-2 bg-white border border-indigo-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-hidden focus:border-indigo-600 shadow-2xs"
                 />
               </div>
 
-              <div className="col-span-6">
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-500 mb-0.5">번호</label>
+                <input
+                  type="text"
+                  value={studentNumber}
+                  onChange={(e) => setStudentNumber(e.target.value)}
+                  placeholder="1번"
+                  className="w-full px-2 py-2 bg-white border border-indigo-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-hidden focus:border-indigo-600 shadow-2xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-500 mb-0.5">이름 (필수)</label>
                 <input
                   type="text"
                   required
                   value={studentName}
                   onChange={(e) => setStudentName(e.target.value)}
-                  placeholder="학생 이름 (예: 김민준)"
-                  className="w-full px-3 py-2 bg-white border-2 border-indigo-300 focus:border-indigo-600 rounded-xl text-xs font-black text-slate-900 placeholder:text-slate-400 focus:outline-hidden"
+                  placeholder="이름 입력"
+                  className="w-full px-2.5 py-2 bg-white border-2 border-indigo-300 focus:border-indigo-600 rounded-xl text-xs font-black text-slate-900 placeholder:text-slate-400 focus:outline-hidden shadow-2xs"
                 />
               </div>
             </div>
+
+            <p className="text-[11px] text-indigo-600 font-medium flex items-center gap-1">
+              <Sparkles className="w-3 h-3 shrink-0 text-amber-500" />
+              <span>사전 명단이 없어도 이름과 학년·반·번호를 넣고 저장하면 바로 기록 및 구글 시트에 자동 저장됩니다.</span>
+            </p>
           </div>
 
           {/* Step 2: Status Selection */}
@@ -327,6 +361,21 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
               onChange={(e) => setReview(e.target.value)}
               placeholder="이 책을 읽고 느낀 점이나 재미있었던 점을 자유롭게 적어보세요..."
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-hidden focus:border-indigo-500 resize-none placeholder:text-slate-400"
+            />
+          </div>
+
+          {/* Step 6: Memorable Quote (Optional) */}
+          <div>
+            <label className="block text-xs font-black text-slate-700 mb-1 flex items-center gap-1">
+              <Check className="w-3.5 h-3.5 text-emerald-600" />
+              <span>5. 기억에 남는 문장 / 인상 깊은 한 줄 (선택)</span>
+            </label>
+            <input
+              type="text"
+              value={quote}
+              onChange={(e) => setQuote(e.target.value)}
+              placeholder="책 속의 멋진 문장이나 인상 깊었던 대사를 적어보세요"
+              className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-hidden focus:border-indigo-500 placeholder:text-slate-400"
             />
           </div>
 

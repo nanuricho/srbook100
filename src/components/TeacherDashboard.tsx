@@ -444,7 +444,24 @@ export function TeacherDashboard({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `서룡초_학생_독서감상기록및별점_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `서룡초_전체학생_독서감상기록및별점_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Export Filtered Book Reviews and Ratings CSV Report for teachers
+  const handleDownloadFilteredReviewsCSV = () => {
+    const targetStudents = filteredStudents.length > 0 ? filteredStudents : students;
+    const csvContent = exportReviewsDetailedCSV(targetStudents, books);
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const filterTag =
+      selectedGradeFilter !== 'ALL' || selectedClassFilter !== 'ALL'
+        ? `_${selectedGradeFilter !== 'ALL' ? selectedGradeFilter : ''}${selectedClassFilter !== 'ALL' ? selectedClassFilter : ''}`
+        : '_전체';
+    link.download = `서룡초_학생_독서감상기록${filterTag}_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -978,6 +995,65 @@ export function TeacherDashboard({
             </div>
           </div>
 
+          {/* Dedicated Google Sheet & Records Download Center Card */}
+          <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 rounded-3xl p-6 md:p-7 text-white shadow-xl space-y-4 border border-indigo-700/50">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-indigo-950 uppercase tracking-wider">
+                    Google Sheets & Excel
+                  </span>
+                  <span className="text-xs font-bold text-indigo-200">
+                    전체 {students.length}명 · 감상평 {overallStats.totalReviews}편 등록됨
+                  </span>
+                </div>
+                <h3 className="text-xl font-black mt-1.5 flex items-center gap-2">
+                  <FileSpreadsheet className="w-5 h-5 text-amber-400" />
+                  <span>학생 독서 감상평 & 구글 시트 다운로드 센터</span>
+                </h3>
+                <p className="text-xs text-indigo-200 mt-1 max-w-2xl leading-relaxed">
+                  학생들이 등록한 감상평(느낀점), 인상 깊은 한 줄, 별점, 완독일자 기록을 엑셀 및 구글 시트 호환 파일(.CSV)로 즉시 다운로드할 수 있습니다.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap shrink-0">
+                <button
+                  type="button"
+                  onClick={handleDownloadReviewsCSV}
+                  disabled={students.length === 0 || overallStats.totalReviews === 0}
+                  className="px-4 py-3 bg-amber-400 hover:bg-amber-300 active:bg-amber-500 text-indigo-950 rounded-2xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>전체 감상평·별점 시트 다운로드</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadCSV}
+                  disabled={students.length === 0}
+                  className="px-4 py-3 bg-indigo-700/80 hover:bg-indigo-700 active:bg-indigo-800 text-white border border-indigo-500/50 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>학급 독서 진도표 다운로드</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-indigo-700/60 flex flex-wrap items-center justify-between gap-3 text-xs text-indigo-200">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>엑셀(Excel) 및 한글 프로그램에서 한글 글자 깨짐 없이 바로 열리는 UTF-8 BOM 인코딩 완벽 지원</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('GAS_SYNC')}
+                className="text-amber-300 hover:text-amber-200 font-bold underline flex items-center gap-1 cursor-pointer"
+              >
+                <span>구글 스프레드시트 실시간 클라우드 연동 관리 &gt;</span>
+              </button>
+            </div>
+          </div>
+
           {/* Top Readers Podium / Leaderboard */}
           <div className="bg-white rounded-3xl p-6 md:p-7 border border-slate-100 shadow-card space-y-4">
             <div className="flex items-center justify-between">
@@ -1223,6 +1299,21 @@ export function TeacherDashboard({
                 <option value="NAME_ASC">이름 순</option>
                 <option value="DATE_DESC">최근 활동 순</option>
               </select>
+
+              {/* Quick CSV Review Download Button */}
+              <button
+                type="button"
+                onClick={handleDownloadFilteredReviewsCSV}
+                className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
+                title="현재 필터 조건의 학생 독서 감상평 및 별점 CSV 다운로드"
+              >
+                <Download className="w-3.5 h-3.5 text-amber-700" />
+                <span>
+                  {selectedGradeFilter !== 'ALL' || selectedClassFilter !== 'ALL'
+                    ? `${selectedGradeFilter !== 'ALL' ? selectedGradeFilter : ''} ${selectedClassFilter !== 'ALL' ? selectedClassFilter : ''} 감상평 받기`
+                    : '감상평 CSV 받기'}
+                </span>
+              </button>
             </div>
           </div>
 
