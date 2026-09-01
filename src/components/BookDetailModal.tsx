@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Book, ReadingRecord, ReadingStatus } from '../types';
-import { X, Star, Calendar, Quote, CheckCircle2, Clock, BookOpen, Save, Trash2 } from 'lucide-react';
+import { X, Star, Calendar, CheckCircle2, Clock, BookOpen, Save, Trash2 } from 'lucide-react';
 
 interface BookDetailModalProps {
   book: Book | null;
@@ -25,7 +25,6 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
     record?.completedDate || new Date().toISOString().split('T')[0]
   );
   const [review, setReview] = useState<string>(record?.review || '');
-  const [quote, setQuote] = useState<string>(record?.quote || '');
 
   useEffect(() => {
     if (record) {
@@ -33,13 +32,11 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
       setRating(record.rating || 0);
       setCompletedDate(record.completedDate || new Date().toISOString().split('T')[0]);
       setReview(record.review || '');
-      setQuote(record.quote || '');
     } else {
       setStatus('UNREAD');
       setRating(0);
       setCompletedDate(new Date().toISOString().split('T')[0]);
       setReview('');
-      setQuote('');
     }
   }, [book, record]);
 
@@ -51,7 +48,6 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
       rating: rating > 0 ? rating : undefined,
       completedDate: status === 'COMPLETED' ? completedDate : undefined,
       review: review.trim() || undefined,
-      quote: quote.trim() || undefined,
       updatedAt: new Date().toISOString(),
     };
     onSaveRecord(updatedRecord);
@@ -193,24 +189,10 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
               한 줄 소감 / 느낀 점
             </label>
             <textarea
-              rows={2}
+              rows={3}
               value={review}
               onChange={(e) => setReview(e.target.value)}
               placeholder="이 책을 읽고 느낀 한 줄 소감을 자유롭게 적어보세요..."
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-hidden focus:border-indigo-500 resize-none placeholder:text-slate-400"
-            />
-          </div>
-
-          {/* Memorable Quote */}
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1">
-              <Quote className="w-3.5 h-3.5 text-indigo-500" /> 기억에 남는 문장이나 장면
-            </label>
-            <textarea
-              rows={2}
-              value={quote}
-              onChange={(e) => setQuote(e.target.value)}
-              placeholder="책 속에서 마음을 울린 한 줄이나 가장 인상 깊었던 장면을 입력하세요..."
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-hidden focus:border-indigo-500 resize-none placeholder:text-slate-400"
             />
           </div>

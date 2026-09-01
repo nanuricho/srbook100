@@ -13,6 +13,13 @@ import {
 } from '../utils/studentStorage';
 import { getCurrentBadge, BADGES } from '../utils/badges';
 import {
+  syncAllRecordsToGoogleSheet,
+  getGoogleScriptUrl,
+  sendRecordToGoogleSheet,
+  saveGoogleScriptUrl,
+  DEFAULT_GAS_WEBAPP_URL,
+} from '../utils/googleAppsScriptSync';
+import {
   Users,
   Upload,
   UserPlus,
@@ -40,6 +47,13 @@ import {
   FileDown,
   RotateCcw,
   UploadCloud,
+  Send,
+  Link,
+  Layers,
+  Database,
+  Lock,
+  LogOut,
+  KeyRound,
 } from 'lucide-react';
 
 interface TeacherDashboardProps {
@@ -49,6 +63,8 @@ interface TeacherDashboardProps {
   onSelectStudentForReading: (student: Student) => void;
   onOpenCertificate: (student: Student) => void;
   currentStudentId: string | null;
+  onLockTeacherMode?: () => void;
+  onOpenPasswordChange?: () => void;
 }
 
 type DeleteActionType =
@@ -64,13 +80,22 @@ export function TeacherDashboard({
   onSelectStudentForReading,
   onOpenCertificate,
   currentStudentId,
+  onLockTeacherMode,
+  onOpenPasswordChange,
 }: TeacherDashboardProps) {
   // Navigation & Sub-views
-  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'ROSTER' | 'BATCH_UPLOAD'>('OVERVIEW');
+  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'ROSTER' | 'BATCH_UPLOAD' | 'GAS_SYNC'>('OVERVIEW');
   const [selectedGradeFilter, setSelectedGradeFilter] = useState<string>('ALL');
   const [selectedClassFilter, setSelectedClassFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortOption, setSortOption] = useState<'READ_DESC' | 'NUM_ASC' | 'NAME_ASC' | 'DATE_DESC'>('READ_DESC');
+
+  // Google Apps Script Sync States
+  const [isGoogleSyncing, setIsGoogleSyncing] = useState<boolean>(false);
+  const [gasSyncProgress, setGasSyncProgress] = useState<{ current: number; total: number } | null>(null);
+  const [gasSyncMessage, setGasSyncMessage] = useState<{ text: string; success: boolean } | null>(null);
+  const [gasUrl, setGasUrl] = useState<string>(() => getGoogleScriptUrl());
+  const [testStatus, setTestStatus] = useState<{ testing: boolean; message?: string; success?: boolean } | null>(null);
 
   // Multi-Selection State for Batch Deletion
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
@@ -399,6 +424,72 @@ export function TeacherDashboard({
     reader.readAsText(file, 'utf-8');
   };
 
+  // Google Apps Script Sync Handlers
+  const handleSyncAllToGoogleSheet = async () => {
+    if (students.length === 0) return;
+    setIsGoogleSyncing(true);
+    setGasSyncMessage(null);
+    setGasSyncProgress({ current: 0, total: 1 });
+    try {
+      const result = await syncAllRecordsToGoogleSheet(students, books, (curr, tot) => {
+        setGasSyncProgress({ current: curr, total: tot });
+      });
+      setGasSyncMessage({
+        text: result.message,
+        success: result.success,
+      });
+    } catch {
+      setGasSyncMessage({
+        text: '구글 스프레드시트 동기화 중 오류가 발생했습니다.',
+        success: false,
+      });
+    } finally {
+      setIsGoogleSyncing(false);
+    }
+  };
+
+  const handleTestGasConnection = async () => {
+    setTestStatus({ testing: true });
+    try {
+      await sendRecordToGoogleSheet(
+        {
+          studentName: '교사용 테스트',
+          grade: '3학년',
+          className: '1반',
+          studentNumber: '1번',
+          bookNum: '1',
+          bookTitle: '서룡초 연동 확인 테스트 도서',
+          author: '시스템',
+          status: 'COMPLETED',
+          rating: 5,
+          review: '교사용 대시보드 구글 스프레드시트 웹앱 연동 신호 테스트입니다.',
+          quote: '정상 작동 확인',
+          completedDate: new Date().toISOString().split('T')[0],
+        },
+        gasUrl.trim()
+      );
+      setTestStatus({
+        testing: false,
+        success: true,
+        message: '연동 신호가 구글 스프레드시트로 정상 발송되었습니다!',
+      });
+    } catch {
+      setTestStatus({
+        testing: false,
+        success: false,
+        message: '연동 테스트 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  const handleSaveGasUrl = () => {
+    saveGoogleScriptUrl(gasUrl);
+    setGasSyncMessage({
+      text: '구글 웹앱 URL이 성공적으로 저장되었습니다.',
+      success: true,
+    });
+  };
+
   return (
     <div className="space-y-6 notranslate" translate="no">
       {/* Top Banner / Navigation for Teacher */}
@@ -406,8 +497,30 @@ export function TeacherDashboard({
         <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl pointer-events-none" />
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-xs font-bold text-indigo-200 backdrop-blur-md mb-2 border border-white/10">
-              <Users className="w-3.5 h-3.5" /> 교사용 관리 대시보드
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-xs font-bold text-indigo-200 backdrop-blur-md border border-white/10">
+                <Users className="w-3.5 h-3.5" /> 교사용 관리 대시보드
+              </div>
+              {onOpenPasswordChange && (
+                <button
+                  onClick={onOpenPasswordChange}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-700/60 hover:bg-indigo-700 text-[11px] font-bold text-indigo-100 border border-indigo-500/40 transition-colors cursor-pointer"
+                  title="교사 비밀번호 변경"
+                >
+                  <KeyRound className="w-3 h-3 text-amber-300" />
+                  비밀번호 변경
+                </button>
+              )}
+              {onLockTeacherMode && (
+                <button
+                  onClick={onLockTeacherMode}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-500/20 hover:bg-rose-500/30 text-[11px] font-bold text-rose-200 border border-rose-400/30 transition-colors cursor-pointer"
+                  title="교사 모드 잠금 (학생이 사용할 수 있도록 교사 권한 잠금)"
+                >
+                  <Lock className="w-3 h-3 text-rose-300" />
+                  교사 모드 잠금
+                </button>
+              )}
             </div>
             <h2 className="text-2xl md:text-3xl font-black tracking-tight">
               서룡초 독서 지도 & 학생 명단 관리
@@ -418,6 +531,20 @@ export function TeacherDashboard({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleSyncAllToGoogleSheet}
+              disabled={isGoogleSyncing || students.length === 0}
+              className="px-4 py-2.5 rounded-2xl text-xs font-black bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-indigo-950 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-md shadow-emerald-900/30"
+              title="전체 학생들의 독서 기록 및 감상평을 구글 스프레드시트로 일괄 동기화합니다"
+            >
+              <Send className={`w-4 h-4 ${isGoogleSyncing ? 'animate-spin' : ''}`} />
+              <span>
+                {isGoogleSyncing
+                  ? `구글 시트 전송 중 (${gasSyncProgress?.current || 0}/${gasSyncProgress?.total || 0})...`
+                  : '구글 시트 전체 동기화'}
+              </span>
+            </button>
+
             <button
               onClick={() => setActiveTab('BATCH_UPLOAD')}
               className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
@@ -443,7 +570,7 @@ export function TeacherDashboard({
               onClick={handleDownloadReviewsCSV}
               disabled={students.length === 0 || overallStats.totalReviews === 0}
               className="px-4 py-2.5 rounded-2xl text-xs font-bold bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-indigo-950 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-xs font-black"
-              title="전체 학생들의 별점 및 감상평, 인상깊은 문장이 기록된 시트 CSV 다운로드"
+              title="전체 학생들의 별점 및 한 줄 감상평이 기록된 시트 CSV 다운로드"
             >
               <Quote className="w-4 h-4" />
               <span>감상평 시트 CSV 다운로드</span>
@@ -452,7 +579,7 @@ export function TeacherDashboard({
             <button
               onClick={handleDownloadCSV}
               disabled={students.length === 0}
-              className="px-4 py-2.5 rounded-2xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
+              className="px-4 py-2.5 rounded-2xl text-xs font-bold bg-indigo-700 hover:bg-indigo-600 text-white transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
             >
               <Download className="w-4 h-4" />
               <span>진도표 CSV 다운로드</span>
@@ -491,6 +618,16 @@ export function TeacherDashboard({
             }`}
           >
             📥 명단 일괄 업로드
+          </button>
+          <button
+            onClick={() => setActiveTab('GAS_SYNC')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'GAS_SYNC'
+                ? 'bg-white text-indigo-900 shadow-xs font-black'
+                : 'text-indigo-200 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            🌐 구글 스프레드시트 연동
           </button>
         </div>
       </div>
@@ -1300,6 +1437,240 @@ export function TeacherDashboard({
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>전체 학생 명단 일괄 삭제 (초기화)</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW 4: GOOGLE APPS SCRIPT SYNC TAB */}
+      {activeTab === 'GAS_SYNC' && (
+        <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-100 shadow-card space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-xs font-bold text-emerald-700 mb-2 border border-emerald-200">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                구글 스프레드시트 실시간 웹앱 연동 센터
+              </div>
+              <h3 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
+                <Database className="w-5 h-5 text-emerald-600" />
+                구글 스프레드시트 독서 기록 자동 동기화
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                학생들이 메인 화면에서 기록한 별점과 감상평이 구글 스프레드시트에 즉시 전송되며, 이곳에서 전체 데이터를 한 번에 일괄 전송할 수도 있습니다.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSyncAllToGoogleSheet}
+                disabled={isGoogleSyncing || students.length === 0}
+                className="px-5 py-3 rounded-2xl text-xs font-black bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-md shadow-emerald-200"
+              >
+                <Send className={`w-4 h-4 ${isGoogleSyncing ? 'animate-spin' : ''}`} />
+                <span>{isGoogleSyncing ? `동기화 진행 중 (${gasSyncProgress?.current || 0}/${gasSyncProgress?.total || 0})...` : '지금 전체 기록 구글 시트로 동기화'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Sync Notifications */}
+          {gasSyncMessage && (
+            <div
+              className={`p-4 rounded-2xl text-xs font-bold flex items-center gap-2.5 animate-fadeIn ${
+                gasSyncMessage.success
+                  ? 'bg-emerald-50 text-emerald-800 border-2 border-emerald-300'
+                  : 'bg-rose-50 text-rose-800 border-2 border-rose-300'
+              }`}
+            >
+              {gasSyncMessage.success ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+              )}
+              <span>{gasSyncMessage.text}</span>
+            </div>
+          )}
+
+          {/* Progress Bar when syncing */}
+          {isGoogleSyncing && gasSyncProgress && (
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+              <div className="flex items-center justify-between text-xs font-black text-slate-700">
+                <span>구글 스프레드시트로 독서 기록을 전송하고 있습니다...</span>
+                <span>
+                  {gasSyncProgress.current} / {gasSyncProgress.total} (
+                  {Math.round((gasSyncProgress.current / Math.max(gasSyncProgress.total, 1)) * 100)}%)
+                </span>
+              </div>
+              <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                <div
+                  className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                  style={{
+                    width: `${Math.min(100, Math.round((gasSyncProgress.current / Math.max(gasSyncProgress.total, 1)) * 100))}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Statistics Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
+              <span className="text-xs font-bold text-slate-400">등록된 전체 학생</span>
+              <p className="text-2xl font-black text-slate-900 mt-1">{students.length}명</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">명단에 등록된 대상 학생</p>
+            </div>
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
+              <span className="text-xs font-bold text-slate-400">동기화 대상 독서 기록</span>
+              <p className="text-2xl font-black text-emerald-600 mt-1">
+                {overallStats.totalCompleted}권 / 감상문 {overallStats.totalReviews}편
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">완독 및 감상평 작성 도서</p>
+            </div>
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
+              <span className="text-xs font-bold text-slate-400">연동 상태</span>
+              <div className="flex items-center gap-1.5 mt-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-sm font-black text-emerald-700">실시간 연동 활성화됨</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">학생 기록 시 자동 전송</p>
+            </div>
+          </div>
+
+          {/* Webhook Configuration Section */}
+          <div className="p-5 rounded-2xl bg-indigo-50/50 border border-indigo-100 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Link className="w-4 h-4 text-indigo-600" />
+                <h4 className="text-sm font-black text-slate-900">
+                  연동된 구글 앱스 스크립트 웹앱 URL (Google Apps Script Web App URL)
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setGasUrl(DEFAULT_GAS_WEBAPP_URL);
+                  saveGoogleScriptUrl(DEFAULT_GAS_WEBAPP_URL);
+                  setGasSyncMessage({ text: '기본 웹앱 URL로 복원되었습니다.', success: true });
+                }}
+                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+              >
+                기본 URL로 재설정
+              </button>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="url"
+                value={gasUrl}
+                onChange={(e) => setGasUrl(e.target.value)}
+                placeholder="https://script.google.com/macros/s/.../exec"
+                className="flex-1 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:outline-hidden focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+              />
+              <div className="flex gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleSaveGasUrl}
+                  className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-xl transition-all cursor-pointer shadow-xs"
+                >
+                  URL 저장
+                </button>
+                <button
+                  type="button"
+                  onClick={handleTestGasConnection}
+                  disabled={testStatus?.testing}
+                  className="px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${testStatus?.testing ? 'animate-spin' : ''}`} />
+                  <span>{testStatus?.testing ? '연동 테스트 중...' : '연동 테스트 전송'}</span>
+                </button>
+              </div>
+            </div>
+
+            {testStatus?.message && (
+              <div
+                className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${
+                  testStatus.success
+                    ? 'bg-emerald-100/80 text-emerald-900 border border-emerald-300'
+                    : 'bg-rose-100/80 text-rose-900 border border-rose-300'
+                }`}
+              >
+                {testStatus.success ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                )}
+                <span>{testStatus.message}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Google Sheet Data Mapping Spec */}
+          <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+            <h4 className="text-xs font-black text-slate-800 flex items-center gap-2">
+              <Layers className="w-4 h-4 text-slate-600" />
+              구글 스프레드시트로 전송되는 열(Column) 구성표
+            </h4>
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2 text-[11px]">
+              <div className="bg-white p-2 rounded-lg border border-slate-200">
+                <span className="text-slate-400 block text-[10px]">1열</span>
+                <span className="font-bold text-slate-800">학생 이름 (studentName)</span>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-slate-200">
+                <span className="text-slate-400 block text-[10px]">2열</span>
+                <span className="font-bold text-slate-800">학년 (grade)</span>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-slate-200">
+                <span className="text-slate-400 block text-[10px]">3열</span>
+                <span className="font-bold text-slate-800">반 (className)</span>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-slate-200">
+                <span className="text-slate-400 block text-[10px]">4열</span>
+                <span className="font-bold text-slate-800">번호 (studentNumber)</span>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-slate-200">
+                <span className="text-slate-400 block text-[10px]">5열</span>
+                <span className="font-bold text-slate-800">도서 번호 (bookNum)</span>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-slate-200">
+                <span className="text-slate-400 block text-[10px]">6열</span>
+                <span className="font-bold text-slate-800">도서명 (bookTitle)</span>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-slate-200">
+                <span className="text-slate-400 block text-[10px]">7열</span>
+                <span className="font-bold text-slate-800">저자 (author)</span>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-slate-200">
+                <span className="text-slate-400 block text-[10px]">8열</span>
+                <span className="font-bold text-slate-800">출판사 (publisher)</span>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-slate-200">
+                <span className="text-slate-400 block text-[10px]">9열</span>
+                <span className="font-bold text-slate-800">권장학년 (bookGrade)</span>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-slate-200">
+                <span className="text-slate-400 block text-[10px]">10열</span>
+                <span className="font-bold text-slate-800">독서 상태 (status)</span>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-slate-200">
+                <span className="text-slate-400 block text-[10px]">11열</span>
+                <span className="font-bold text-slate-800">별점 평점 (rating)</span>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-slate-200">
+                <span className="text-slate-400 block text-[10px]">12열</span>
+                <span className="font-bold text-slate-800">한 줄 감상평 (review)</span>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-slate-200">
+                <span className="text-slate-400 block text-[10px]">13열</span>
+                <span className="font-bold text-slate-800">인상 깊은 구절 (quote)</span>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-slate-200">
+                <span className="text-slate-400 block text-[10px]">14열</span>
+                <span className="font-bold text-slate-800">완독 일자 (completedDate)</span>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-slate-200">
+                <span className="text-slate-400 block text-[10px]">15열</span>
+                <span className="font-bold text-slate-800">전송 일시 (timestamp)</span>
+              </div>
             </div>
           </div>
         </div>

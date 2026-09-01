@@ -13,6 +13,7 @@ import {
   Search,
   Check,
   ChevronDown,
+  LogOut,
 } from 'lucide-react';
 
 interface QuickRecordHeroProps {
@@ -22,6 +23,7 @@ interface QuickRecordHeroProps {
   onSelectStudent: (student: Student) => void;
   onRegisterStudent: (newStudent: Student) => void;
   onSaveRecord: (studentId: string, record: ReadingRecord) => void;
+  onStudentLogout?: () => void;
 }
 
 export function QuickRecordHero({
@@ -31,6 +33,7 @@ export function QuickRecordHero({
   onSelectStudent,
   onRegisterStudent,
   onSaveRecord,
+  onStudentLogout,
 }: QuickRecordHeroProps) {
   // Mode: existing student selection vs. new student name input
   const [studentInputName, setStudentInputName] = useState<string>(activeStudent?.name || '');
@@ -48,7 +51,6 @@ export function QuickRecordHero({
   const [rating, setRating] = useState<number>(5);
   const [status, setStatus] = useState<'COMPLETED' | 'IN_PROGRESS'>('COMPLETED');
   const [review, setReview] = useState<string>('');
-  const [quote, setQuote] = useState<string>('');
   const [isSubmittedSuccess, setIsSubmittedSuccess] = useState<boolean>(false);
 
   // Available grades for books
@@ -74,6 +76,8 @@ export function QuickRecordHero({
       if (activeStudent.grade) {
         setSelectedBookGrade(activeStudent.grade);
       }
+    } else {
+      setStudentInputName('');
     }
   }, [activeStudent]);
 
@@ -115,12 +119,10 @@ export function QuickRecordHero({
       const rec = activeStudent.records[selectedBookNum];
       setRating(rec.rating || 5);
       setReview(rec.review || '');
-      setQuote(rec.quote || '');
       setStatus(rec.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'COMPLETED');
     } else {
       setRating(5);
       setReview('');
-      setQuote('');
       setStatus('COMPLETED');
     }
   }, [activeStudent, selectedBookNum]);
@@ -187,7 +189,6 @@ export function QuickRecordHero({
       status: status,
       rating: rating,
       review: review.trim() || undefined,
-      quote: quote.trim() || undefined,
       completedDate: status === 'COMPLETED' ? new Date().toISOString().split('T')[0] : undefined,
       updatedAt: new Date().toISOString(),
     };
@@ -206,9 +207,15 @@ export function QuickRecordHero({
         {/* Title Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-indigo-700/60 pb-4 mb-5">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 text-xs font-black mb-1.5 border border-amber-300/30">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>실시간 독서 감상평 간편 기록</span>
+            <div className="flex items-center gap-2 flex-wrap mb-1.5">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 text-xs font-black border border-amber-300/30">
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                <span>실시간 독서 감상평 간편 기록</span>
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-bold border border-emerald-400/30">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>구글 스프레드시트 실시간 자동 연동</span>
+              </div>
             </div>
             <h2 className="text-xl md:text-2xl font-black text-white tracking-tight flex items-center gap-2">
               📝 내 이름으로 독서 감상평 & 별점 남기기
@@ -218,13 +225,32 @@ export function QuickRecordHero({
             </p>
           </div>
 
-          {activeStudent && (
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3.5 py-1.5 rounded-2xl border border-white/15 text-xs">
+          {activeStudent ? (
+            <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-md px-3.5 py-1.5 rounded-2xl border border-white/20 text-xs shadow-xs">
               <User className="w-3.5 h-3.5 text-amber-300" />
-              <span className="text-indigo-200 font-medium">현재 접속 학생:</span>
+              <span className="text-indigo-200 font-medium">현재 접속:</span>
               <span className="font-black text-amber-300">
                 {activeStudent.grade} {activeStudent.className} {activeStudent.name}
               </span>
+              {onStudentLogout && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onStudentLogout();
+                    setStudentInputName('');
+                  }}
+                  className="ml-1.5 px-2 py-0.5 bg-rose-500/80 hover:bg-rose-600 active:bg-rose-700 text-white rounded-lg text-[10px] font-black transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                  title="기록 종료 및 이름 숨기기"
+                >
+                  <LogOut className="w-3 h-3" />
+                  <span>나가기</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/15 text-xs text-indigo-200">
+              <User className="w-3.5 h-3.5 text-amber-300" />
+              <span>학생 이름을 입력해 기록을 시작하세요</span>
             </div>
           )}
         </div>
@@ -238,28 +264,17 @@ export function QuickRecordHero({
                 <span className="text-xs font-black text-amber-300 flex items-center gap-1">
                   <User className="w-3.5 h-3.5" /> 1. 학생 정보 입력
                 </span>
-                {students.length > 0 && (
-                  <select
-                    onChange={(e) => {
-                      const st = students.find((s) => s.id === e.target.value);
-                      if (st) {
-                        onSelectStudent(st);
-                        setStudentInputName(st.name);
-                        setStudentGrade(st.grade || '3학년');
-                        setStudentClass(st.className || '1반');
-                        setStudentNumber(st.studentNumber || '1번');
-                      }
+                {activeStudent && onStudentLogout && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onStudentLogout();
+                      setStudentInputName('');
                     }}
-                    value={activeStudent?.id || ''}
-                    className="text-[11px] bg-indigo-950/80 text-indigo-200 border border-indigo-500/50 rounded-lg px-2 py-0.5 font-bold cursor-pointer"
+                    className="text-[10px] font-bold text-rose-300 hover:text-white bg-rose-900/50 hover:bg-rose-800/80 px-2 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1"
                   >
-                    <option value="">명단에서 선택</option>
-                    {students.map((st) => (
-                      <option key={st.id} value={st.id}>
-                        {st.grade} {st.className} {st.name}
-                      </option>
-                    ))}
-                  </select>
+                    <LogOut className="w-2.5 h-2.5" /> 나가기
+                  </button>
                 )}
               </div>
 
@@ -475,57 +490,62 @@ export function QuickRecordHero({
                 </div>
               </div>
 
-              {/* Review & Quote inputs */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] text-indigo-200 font-bold mb-1 flex items-center gap-1">
-                    <Quote className="w-3 h-3 text-amber-300" /> 기억에 남는 한 줄 / 인상 깊은 문장
-                  </label>
-                  <input
-                    type="text"
-                    value={quote}
-                    onChange={(e) => setQuote(e.target.value)}
-                    placeholder="인상 깊었던 문장이나 구절을 적어보세요..."
-                    className="w-full px-3 py-1.5 bg-indigo-950/90 border border-indigo-400/40 rounded-xl text-xs text-white placeholder:text-indigo-400/60 focus:outline-hidden focus:border-amber-400"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] text-indigo-200 font-bold mb-1 flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-amber-300" /> 간단 감상평 (느낀 점)
-                  </label>
-                  <input
-                    type="text"
-                    value={review}
-                    onChange={(e) => setReview(e.target.value)}
-                    placeholder="이 책을 읽고 든 생각이나 느낌을 간단히 적어보세요..."
-                    className="w-full px-3 py-1.5 bg-indigo-950/90 border border-indigo-400/40 rounded-xl text-xs text-white placeholder:text-indigo-400/60 focus:outline-hidden focus:border-amber-400"
-                  />
-                </div>
+              {/* Review input */}
+              <div>
+                <label className="block text-[11px] text-indigo-200 font-bold mb-1.5 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>간단 감상평 (느낀 점)</span>
+                </label>
+                <input
+                  type="text"
+                  value={review}
+                  onChange={(e) => setReview(e.target.value)}
+                  placeholder="이 책을 읽고 든 생각이나 느낌을 자유롭게 적어보세요..."
+                  className="w-full px-3.5 py-2 bg-indigo-950/90 border border-indigo-400/40 rounded-xl text-xs text-white placeholder:text-indigo-400/60 focus:outline-hidden focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition-all"
+                />
               </div>
 
               {/* Submit Button & Status Message */}
-              <div className="flex items-center justify-between pt-1">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
                 <div>
                   {isSubmittedSuccess ? (
-                    <span className="inline-flex items-center gap-1.5 text-xs font-black text-emerald-300 animate-fadeIn">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      감상평과 평점이 성공적으로 저장되었습니다! 🎉
-                    </span>
+                    <div className="flex items-center gap-3 flex-wrap animate-fadeIn">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-black text-emerald-300">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        감상평과 평점이 성공적으로 저장되었습니다! 🎉
+                      </span>
+                      {onStudentLogout && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onStudentLogout();
+                            setStudentInputName('');
+                            setReview('');
+                          }}
+                          className="px-3 py-1 bg-white/20 hover:bg-rose-600 text-white rounded-xl text-xs font-black transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
+                        >
+                          <LogOut className="w-3.5 h-3.5 text-amber-300" />
+                          <span>기록 완료하고 나가기</span>
+                        </button>
+                      )}
+                    </div>
                   ) : (
-                    <span className="text-[11px] text-indigo-300 font-medium">
-                      💡 기록된 내용은 즉시 통계와 교사 대시보드 시트에 반영됩니다.
+                    <span className="text-[11px] text-indigo-200 font-medium flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                      등록 시 학생 독서 기록장에 저장되고 구글 스프레드시트에 자동 수합됩니다.
                     </span>
                   )}
                 </div>
 
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-amber-400 hover:bg-amber-300 active:bg-amber-500 text-indigo-950 font-black rounded-xl text-xs transition-all shadow-md shadow-amber-400/30 flex items-center gap-1.5 cursor-pointer shrink-0"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>감상 기록 등록하기</span>
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 active:bg-amber-500 text-indigo-950 font-black rounded-xl text-xs transition-all shadow-md shadow-amber-400/30 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>감상 기록 등록하기</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>

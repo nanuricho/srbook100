@@ -13,12 +13,22 @@ import { SettingsModal } from './components/SettingsModal';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { StudentLookupView } from './components/StudentLookupView';
 import { QuickRecordHero } from './components/QuickRecordHero';
+import { TeacherAuthModal } from './components/TeacherAuthModal';
 import {
   loadStudentsFromStorage,
   saveStudentsToStorage,
   getCompletedCount,
   STORAGE_KEY_CURRENT_STUDENT_ID,
 } from './utils/studentStorage';
+import {
+  isTeacherSessionAuthenticated,
+  setTeacherSessionAuthenticated,
+} from './utils/teacherAuth';
+import {
+  DEFAULT_GAS_WEBAPP_URL,
+  getGoogleScriptUrl,
+  saveGoogleScriptUrl,
+} from './utils/googleAppsScriptSync';
 import { BookOpen, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 
 const DEFAULT_SHEET_URL =
@@ -29,6 +39,16 @@ const STORAGE_KEY_SHEET_URL = 'seoryong_sheet_url';
 export default function App() {
   const [books, setBooks] = useState<Book[]>(DEFAULT_BOOKS);
   const [sheetUrl, setSheetUrl] = useState<string>(DEFAULT_SHEET_URL);
+  const [gasUrl, setGasUrl] = useState<string>(() => getGoogleScriptUrl());
+
+  // Teacher Authentication state
+  const [isTeacherAuthenticated, setIsTeacherAuthenticated] = useState<boolean>(() =>
+    isTeacherSessionAuthenticated()
+  );
+  const [isTeacherAuthModalOpen, setIsTeacherAuthModalOpen] = useState<boolean>(false);
+  const [teacherAuthTarget, setTeacherAuthTarget] = useState<'TEACHER_DASHBOARD' | 'SETTINGS' | 'PASSWORD_CHANGE'>(
+    'TEACHER_DASHBOARD'
+  );
 
   // Multi-student roster state
   const [students, setStudents] = useState<Student[]>(() => loadStudentsFromStorage());
@@ -38,7 +58,7 @@ export default function App() {
     if (savedId && initialStudents.some((s) => s.id === savedId)) {
       return savedId;
     }
-    return initialStudents[0]?.id || '';
+    return '';
   });
 
   // Current active navigation tab
@@ -60,9 +80,10 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
-  // Active student object
+  // Active student object (null when logged out or unselected)
   const activeStudent = useMemo(() => {
-    return students.find((s) => s.id === currentStudentId) || students[0] || null;
+    if (!currentStudentId) return null;
+    return students.find((s) => s.id === currentStudentId) || null;
   }, [students, currentStudentId]);
 
   // Current active records from activeStudent
@@ -98,6 +119,13 @@ export default function App() {
     setCurrentStudentId(student.id);
     localStorage.setItem(STORAGE_KEY_CURRENT_STUDENT_ID, student.id);
     showToast(`'${student.name}' 학생으로 전환되었습니다! 📚`, 'success');
+  };
+
+  // Logout / Clear Active Student
+  const handleLogoutStudent = () => {
+    setCurrentStudentId('');
+    localStorage.removeItem(STORAGE_KEY_CURRENT_STUDENT_ID);
+    showToast('독서 기록 및 조회를 종료하고 안전하게 나갔습니다. 👋', 'info');
   };
 
   // Add a newly registered student and switch to them
@@ -266,10 +294,52 @@ export default function App() {
     showToast(`No.${num} 도서 기록을 초기화했습니다.`, 'info');
   };
 
+  // Teacher Authentication Handlers
+  const handleOpenTeacherAuth = (target: 'TEACHER_DASHBOARD' | 'SETTINGS' | 'PASSWORD_CHANGE') => {
+    setTeacherAuthTarget(target);
+    setIsTeacherAuthModalOpen(true);
+  };
+
+  const handleTeacherAuthSuccess = () => {
+    setIsTeacherAuthenticated(true);
+    setTeacherSessionAuthenticated(true);
+    setIsTeacherAuthModalOpen(false);
+
+    if (teacherAuthTarget === 'TEACHER_DASHBOARD') {
+      setActiveTab('TEACHER_DASHBOARD');
+      showToast('교사 인증 완료! 교사 대시보드로 이동했습니다. 👩‍🏫', 'success');
+    } else if (teacherAuthTarget === 'SETTINGS') {
+      setIsSettingsOpen(true);
+      showToast('교사 인증 완료! 설정 창을 열었습니다. ⚙️', 'success');
+    } else if (teacherAuthTarget === 'PASSWORD_CHANGE') {
+      showToast('교사 비밀번호가 안전하게 변경되었습니다! 🔑', 'success');
+    }
+  };
+
+  const handleTeacherLogout = () => {
+    setIsTeacherAuthenticated(false);
+    setTeacherSessionAuthenticated(false);
+    if (activeTab === 'TEACHER_DASHBOARD') {
+      setActiveTab('BOOKS');
+    }
+    showToast('교사 권한이 잠겼습니다. 안전한 학생 모드로 전환되었습니다. 🔒', 'info');
+  };
+
+  const handleTabChange = (tab: AppTab) => {
+    if (tab === 'TEACHER_DASHBOARD' && !isTeacherAuthenticated) {
+      handleOpenTeacherAuth('TEACHER_DASHBOARD');
+      return;
+    }
+    setActiveTab(tab);
+  };
+
   // Save Settings
-  const handleSaveSettings = (newUrl: string, name: string, gradeClass: string) => {
+  const handleSaveSettings = (newUrl: string, newGasUrl: string, name: string, gradeClass: string) => {
     setSheetUrl(newUrl);
     localStorage.setItem(STORAGE_KEY_SHEET_URL, newUrl);
+
+    setGasUrl(newGasUrl);
+    saveGoogleScriptUrl(newGasUrl);
 
     // If active student exists, update their name and grade/class
     if (activeStudent) {
@@ -461,7 +531,7 @@ export default function App() {
         {/* Header */}
         <Header
           activeTab={activeTab}
-          onChangeTab={setActiveTab}
+          onChangeTab={handleTabChange}
           activeStudent={activeStudent}
           completedCount={completedCount}
           totalCount={books.length}
@@ -469,8 +539,18 @@ export default function App() {
           isSyncing={isSyncing}
           onRefreshData={() => fetchBooksFromCSV(sheetUrl)}
           onOpenCertificate={() => handleOpenCertificateModal()}
-          onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenSettings={() => {
+            if (isTeacherAuthenticated) {
+              setIsSettingsOpen(true);
+            } else {
+              handleOpenTeacherAuth('SETTINGS');
+            }
+          }}
           totalStudentsCount={students.length}
+          isTeacherAuthenticated={isTeacherAuthenticated}
+          onTeacherLogout={handleTeacherLogout}
+          onOpenTeacherAuth={handleOpenTeacherAuth}
+          onStudentLogout={handleLogoutStudent}
         />
 
         {/* TAB 1: 100 BOOKS EXPLORATION & RECORDING */}
@@ -484,6 +564,7 @@ export default function App() {
               onSelectStudent={handleSelectStudent}
               onRegisterStudent={handleRegisterNewStudent}
               onSaveRecord={handleSaveRecordForStudent}
+              onStudentLogout={handleLogoutStudent}
             />
 
             {/* Reading Statistics Overview */}
@@ -558,6 +639,7 @@ export default function App() {
             onGoToBooks={() => setActiveTab('BOOKS')}
             onRegisterStudent={handleRegisterNewStudent}
             onDeleteStudent={handleDeleteSingleStudent}
+            onStudentLogout={handleLogoutStudent}
           />
         )}
 
@@ -573,6 +655,8 @@ export default function App() {
             }}
             onOpenCertificate={(st) => handleOpenCertificateModal(st)}
             currentStudentId={currentStudentId}
+            onLockTeacherMode={handleTeacherLogout}
+            onOpenPasswordChange={() => handleOpenTeacherAuth('PASSWORD_CHANGE')}
           />
         )}
 
@@ -616,6 +700,7 @@ export default function App() {
       {isSettingsOpen && (
         <SettingsModal
           sheetUrl={sheetUrl}
+          gasUrl={gasUrl}
           studentName={activeStudent?.name || '서룡 어린이'}
           studentGradeClass={`${activeStudent?.grade || '3학년'} ${activeStudent?.className || '1반'}`}
           onSaveSettings={handleSaveSettings}
@@ -624,8 +709,18 @@ export default function App() {
           onResetData={handleResetData}
           onClose={() => setIsSettingsOpen(false)}
           defaultUrl={DEFAULT_SHEET_URL}
+          defaultGasUrl={DEFAULT_GAS_WEBAPP_URL}
+          onOpenPasswordChange={() => handleOpenTeacherAuth('PASSWORD_CHANGE')}
         />
       )}
+
+      {/* Teacher Authentication Modal */}
+      <TeacherAuthModal
+        isOpen={isTeacherAuthModalOpen}
+        onClose={() => setIsTeacherAuthModalOpen(false)}
+        onSuccess={handleTeacherAuthSuccess}
+        targetName={teacherAuthTarget}
+      />
     </div>
   );
 }
