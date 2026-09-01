@@ -67,11 +67,13 @@ interface TeacherDashboardProps {
   onOpenPasswordChange?: () => void;
 }
 
+type DeleteTargetCategory = 'ROSTER_ONLY' | 'RECORDS_ONLY' | 'ALL';
+
 type DeleteActionType =
-  | { type: 'SINGLE'; student: Student }
-  | { type: 'MULTIPLE'; studentIds: string[]; count: number }
-  | { type: 'FILTERED'; grade: string; className: string; count: number; studentIds: string[] }
-  | { type: 'ALL'; count: number };
+  | { type: 'SINGLE'; student: Student; category?: DeleteTargetCategory }
+  | { type: 'MULTIPLE'; studentIds: string[]; count: number; category?: DeleteTargetCategory }
+  | { type: 'FILTERED'; grade: string; className: string; count: number; studentIds: string[]; category?: DeleteTargetCategory }
+  | { type: 'ALL'; count: number; category?: DeleteTargetCategory };
 
 export function TeacherDashboard({
   books,
@@ -102,6 +104,7 @@ export function TeacherDashboard({
 
   // Deletion Confirmation Modal State
   const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteActionType | null>(null);
+  const [deleteScopeMode, setDeleteScopeMode] = useState<DeleteTargetCategory>('ROSTER_ONLY');
 
   // Inspected student for detailed portfolio modal
   const [inspectedStudent, setInspectedStudent] = useState<Student | null>(null);
@@ -319,45 +322,93 @@ export function TeacherDashboard({
     );
   };
 
-  // Execute Confirmed Deletions
+  // Execute Confirmed Deletions (Roster vs Records vs Both)
   const handleConfirmDelete = () => {
     if (!deleteConfirmation) return;
+    const mode = deleteConfirmation.category || deleteScopeMode;
 
     let updated: Student[] = [];
 
-    switch (deleteConfirmation.type) {
-      case 'SINGLE': {
-        const targetId = deleteConfirmation.student.id;
-        updated = students.filter((s) => s.id !== targetId);
-        if (inspectedStudent?.id === targetId) {
-          setInspectedStudent(null);
+    if (mode === 'RECORDS_ONLY') {
+      // Only clear reading records, keep student in roster
+      switch (deleteConfirmation.type) {
+        case 'SINGLE': {
+          const targetId = deleteConfirmation.student.id;
+          updated = students.map((s) =>
+            s.id === targetId ? { ...s, records: {}, updatedAt: new Date().toISOString() } : s
+          );
+          if (inspectedStudent?.id === targetId) {
+            setInspectedStudent({ ...inspectedStudent, records: {}, updatedAt: new Date().toISOString() });
+          }
+          break;
         }
-        setSelectedStudentIds((prev) => prev.filter((id) => id !== targetId));
-        break;
-      }
-      case 'MULTIPLE': {
-        const toDeleteSet = new Set(deleteConfirmation.studentIds);
-        updated = students.filter((s) => !toDeleteSet.has(s.id));
-        if (inspectedStudent && toDeleteSet.has(inspectedStudent.id)) {
-          setInspectedStudent(null);
+        case 'MULTIPLE': {
+          const targetSet = new Set(deleteConfirmation.studentIds);
+          updated = students.map((s) =>
+            targetSet.has(s.id) ? { ...s, records: {}, updatedAt: new Date().toISOString() } : s
+          );
+          if (inspectedStudent && targetSet.has(inspectedStudent.id)) {
+            setInspectedStudent({ ...inspectedStudent, records: {}, updatedAt: new Date().toISOString() });
+          }
+          setSelectedStudentIds([]);
+          break;
         }
-        setSelectedStudentIds([]);
-        break;
-      }
-      case 'FILTERED': {
-        const toDeleteSet = new Set(deleteConfirmation.studentIds);
-        updated = students.filter((s) => !toDeleteSet.has(s.id));
-        if (inspectedStudent && toDeleteSet.has(inspectedStudent.id)) {
-          setInspectedStudent(null);
+        case 'FILTERED': {
+          const targetSet = new Set(deleteConfirmation.studentIds);
+          updated = students.map((s) =>
+            targetSet.has(s.id) ? { ...s, records: {}, updatedAt: new Date().toISOString() } : s
+          );
+          if (inspectedStudent && targetSet.has(inspectedStudent.id)) {
+            setInspectedStudent({ ...inspectedStudent, records: {}, updatedAt: new Date().toISOString() });
+          }
+          setSelectedStudentIds((prev) => prev.filter((id) => !targetSet.has(id)));
+          break;
         }
-        setSelectedStudentIds((prev) => prev.filter((id) => !toDeleteSet.has(id)));
-        break;
+        case 'ALL': {
+          updated = students.map((s) => ({ ...s, records: {}, updatedAt: new Date().toISOString() }));
+          if (inspectedStudent) {
+            setInspectedStudent({ ...inspectedStudent, records: {}, updatedAt: new Date().toISOString() });
+          }
+          setSelectedStudentIds([]);
+          break;
+        }
       }
-      case 'ALL': {
-        updated = [];
-        setInspectedStudent(null);
-        setSelectedStudentIds([]);
-        break;
+    } else {
+      // Remove student from roster completely
+      switch (deleteConfirmation.type) {
+        case 'SINGLE': {
+          const targetId = deleteConfirmation.student.id;
+          updated = students.filter((s) => s.id !== targetId);
+          if (inspectedStudent?.id === targetId) {
+            setInspectedStudent(null);
+          }
+          setSelectedStudentIds((prev) => prev.filter((id) => id !== targetId));
+          break;
+        }
+        case 'MULTIPLE': {
+          const toDeleteSet = new Set(deleteConfirmation.studentIds);
+          updated = students.filter((s) => !toDeleteSet.has(s.id));
+          if (inspectedStudent && toDeleteSet.has(inspectedStudent.id)) {
+            setInspectedStudent(null);
+          }
+          setSelectedStudentIds([]);
+          break;
+        }
+        case 'FILTERED': {
+          const toDeleteSet = new Set(deleteConfirmation.studentIds);
+          updated = students.filter((s) => !toDeleteSet.has(s.id));
+          if (inspectedStudent && toDeleteSet.has(inspectedStudent.id)) {
+            setInspectedStudent(null);
+          }
+          setSelectedStudentIds((prev) => prev.filter((id) => !toDeleteSet.has(id)));
+          break;
+        }
+        case 'ALL': {
+          updated = [];
+          setInspectedStudent(null);
+          setSelectedStudentIds([]);
+          break;
+        }
       }
     }
 
@@ -1197,17 +1248,37 @@ export function TeacherDashboard({
                 </button>
 
                 <button
-                  onClick={() =>
+                  onClick={() => {
+                    setDeleteScopeMode('RECORDS_ONLY');
                     setDeleteConfirmation({
                       type: 'MULTIPLE',
                       studentIds: selectedStudentIds,
                       count: selectedStudentIds.length,
-                    })
-                  }
+                      category: 'RECORDS_ONLY',
+                    });
+                  }}
+                  className="px-3.5 py-1.5 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-indigo-950 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-sm font-black"
+                  title="선택한 학생들의 독서 기록 및 감상평만 초기화하고 명단은 유지합니다"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>기록만 초기화 ({selectedStudentIds.length}명)</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setDeleteScopeMode('ROSTER_ONLY');
+                    setDeleteConfirmation({
+                      type: 'MULTIPLE',
+                      studentIds: selectedStudentIds,
+                      count: selectedStudentIds.length,
+                      category: 'ROSTER_ONLY',
+                    });
+                  }}
                   className="px-4 py-1.5 text-xs font-black bg-rose-600 hover:bg-rose-700 text-white rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+                  title="선택한 학생들을 명단에서 완전히 삭제합니다"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  <span>선택한 {selectedStudentIds.length}명 일괄 삭제</span>
+                  <span>명단에서 삭제 ({selectedStudentIds.length}명)</span>
                 </button>
               </div>
             </div>
@@ -1366,13 +1437,31 @@ export function TeacherDashboard({
                             </button>
 
                             <button
-                              onClick={() =>
+                              onClick={() => {
+                                setDeleteScopeMode('RECORDS_ONLY');
                                 setDeleteConfirmation({
                                   type: 'SINGLE',
                                   student: s,
-                                })
-                              }
-                              title="학생 및 독서기록 삭제"
+                                  category: 'RECORDS_ONLY',
+                                });
+                              }}
+                              disabled={completed === 0 && inProgress === 0}
+                              title="이 학생의 독서 기록만 초기화 (명단은 유지)"
+                              className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed"
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                setDeleteScopeMode('ROSTER_ONLY');
+                                setDeleteConfirmation({
+                                  type: 'SINGLE',
+                                  student: s,
+                                  category: 'ROSTER_ONLY',
+                                });
+                              }}
+                              title="학생 명단에서 완전 삭제"
                               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -1402,40 +1491,87 @@ export function TeacherDashboard({
 
             <div className="flex items-center gap-2 flex-wrap">
               {selectedGradeFilter !== 'ALL' && filteredStudents.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setDeleteConfirmation({
-                      type: 'FILTERED',
-                      grade: selectedGradeFilter,
-                      className: selectedClassFilter,
-                      count: filteredStudents.length,
-                      studentIds: filteredStudents.map((s) => s.id),
-                    })
-                  }
-                  className="px-3 py-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-all cursor-pointer flex items-center gap-1"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>
-                    {selectedGradeFilter} {selectedClassFilter !== 'ALL' ? selectedClassFilter : ''} (
-                    {filteredStudents.length}명) 전체 삭제
-                  </span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteScopeMode('RECORDS_ONLY');
+                      setDeleteConfirmation({
+                        type: 'FILTERED',
+                        grade: selectedGradeFilter,
+                        className: selectedClassFilter,
+                        count: filteredStudents.length,
+                        studentIds: filteredStudents.map((s) => s.id),
+                        category: 'RECORDS_ONLY',
+                      });
+                    }}
+                    className="px-3 py-1.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl transition-all cursor-pointer flex items-center gap-1"
+                    title="선택된 학년/반 학생들의 독서 기록만 초기화하고 명단은 유지합니다"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+                    <span>
+                      {selectedGradeFilter} {selectedClassFilter !== 'ALL' ? selectedClassFilter : ''} 기록 초기화
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteScopeMode('ROSTER_ONLY');
+                      setDeleteConfirmation({
+                        type: 'FILTERED',
+                        grade: selectedGradeFilter,
+                        className: selectedClassFilter,
+                        count: filteredStudents.length,
+                        studentIds: filteredStudents.map((s) => s.id),
+                        category: 'ROSTER_ONLY',
+                      });
+                    }}
+                    className="px-3 py-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-all cursor-pointer flex items-center gap-1"
+                    title="선택된 학년/반 학생들을 명단에서 삭제합니다"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>
+                      {selectedGradeFilter} {selectedClassFilter !== 'ALL' ? selectedClassFilter : ''} ({filteredStudents.length}명) 명단 삭제
+                    </span>
+                  </button>
+                </>
               )}
 
               <button
                 type="button"
-                onClick={() =>
+                onClick={() => {
+                  setDeleteScopeMode('RECORDS_ONLY');
                   setDeleteConfirmation({
                     type: 'ALL',
                     count: students.length,
-                  })
-                }
+                    category: 'RECORDS_ONLY',
+                  });
+                }}
+                disabled={students.length === 0}
+                className="px-3 py-1.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+                title="모든 학생의 독서 기록만 초기화하고 학생 명단은 그대로 유지합니다"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+                <span>전체 독서 기록만 초기화</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteScopeMode('ROSTER_ONLY');
+                  setDeleteConfirmation({
+                    type: 'ALL',
+                    count: students.length,
+                    category: 'ROSTER_ONLY',
+                  });
+                }}
                 disabled={students.length === 0}
                 className="px-3 py-1.5 text-xs font-bold text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-xl transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+                title="모든 학생의 명단과 기록을 완전히 삭제하여 초기 상태로 만듭니다"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>전체 학생 명단 일괄 삭제 (초기화)</span>
+                <span>전체 학생 명단 일괄 삭제</span>
               </button>
             </div>
           </div>
@@ -1799,20 +1935,43 @@ export function TeacherDashboard({
             </div>
 
             {/* Modal Bottom Actions */}
-            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => {
-                  setDeleteConfirmation({
-                    type: 'SINGLE',
-                    student: inspectedStudent,
-                  });
-                }}
-                className="px-3.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>이 학생 삭제</span>
-              </button>
+            <div className="flex items-center justify-between pt-4 border-t border-slate-100 flex-wrap gap-2">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteScopeMode('RECORDS_ONLY');
+                    setDeleteConfirmation({
+                      type: 'SINGLE',
+                      student: inspectedStudent,
+                      category: 'RECORDS_ONLY',
+                    });
+                  }}
+                  disabled={getCompletedCount(inspectedStudent) === 0 && getInProgressCount(inspectedStudent) === 0}
+                  className="px-3 py-2 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed border border-amber-200"
+                  title="이 학생의 독서 기록만 초기화하고 명단은 보존합니다"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+                  <span>독서 기록만 초기화</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteScopeMode('ROSTER_ONLY');
+                    setDeleteConfirmation({
+                      type: 'SINGLE',
+                      student: inspectedStudent,
+                      category: 'ROSTER_ONLY',
+                    });
+                  }}
+                  className="px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 border border-rose-200"
+                  title="이 학생을 명단에서 완전히 삭제합니다"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>학생 명단 삭제</span>
+                </button>
+              </div>
 
               <div className="flex items-center gap-2">
                 <button
@@ -1844,58 +2003,136 @@ export function TeacherDashboard({
         </div>
       )}
 
-      {/* DELETION SAFETY CONFIRMATION MODAL */}
-      {deleteConfirmation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-scaleUp">
-            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
+      {/* DELETION & RESET CONFIRMATION MODAL */}
+      {deleteConfirmation && (() => {
+        const isRecordReset = (deleteConfirmation.category || deleteScopeMode) === 'RECORDS_ONLY';
 
-            <div className="text-center space-y-1">
-              <h3 className="text-lg font-black text-slate-900">
-                {deleteConfirmation.type === 'SINGLE' && `'${deleteConfirmation.student.name}' 학생 삭제`}
-                {deleteConfirmation.type === 'MULTIPLE' &&
-                  `선택한 ${deleteConfirmation.count}명의 학생 일괄 삭제`}
-                {deleteConfirmation.type === 'FILTERED' &&
-                  `${deleteConfirmation.grade} ${deleteConfirmation.className} 학생 (${deleteConfirmation.count}명) 전체 삭제`}
-                {deleteConfirmation.type === 'ALL' && '전체 학생 명단 일괄 삭제 (초기화)'}
-              </h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                {deleteConfirmation.type === 'SINGLE' &&
-                  `${deleteConfirmation.student.grade} ${deleteConfirmation.student.className} ${deleteConfirmation.student.name} 학생의 명단 및 완독 도서, 독서록 기록이 모두 삭제됩니다.`}
-                {deleteConfirmation.type === 'MULTIPLE' &&
-                  `선택된 ${deleteConfirmation.count}명의 학생 명단과 해당 학생들의 독서 기록이 모두 영구 삭제됩니다.`}
-                {deleteConfirmation.type === 'FILTERED' &&
-                  `해당 학급의 학생 ${deleteConfirmation.count}명과 독서 기록이 모두 삭제됩니다.`}
-                {deleteConfirmation.type === 'ALL' &&
-                  `등록된 모든 학생 (${deleteConfirmation.count}명)의 명단 및 독서록 데이터가 완전히 삭제됩니다.`}
-              </p>
-            </div>
-
-            <div className="p-3 bg-rose-50 rounded-2xl text-[11px] text-rose-700 font-bold text-center border border-rose-200">
-              ⚠️ 이 작업은 되돌릴 수 없습니다. 계속 진행하시겠습니까?
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setDeleteConfirmation(null)}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer"
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+            <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-scaleUp">
+              <div
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto ${
+                  isRecordReset ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-600'
+                }`}
               >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDelete}
-                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-xl transition-all cursor-pointer shadow-md shadow-rose-200"
-              >
-                삭제 확인
-              </button>
+                {isRecordReset ? <RotateCcw className="w-6 h-6" /> : <AlertTriangle className="w-6 h-6" />}
+              </div>
+
+              <div className="text-center space-y-1">
+                <div className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-extrabold mb-1 bg-slate-100 text-slate-700">
+                  {isRecordReset ? '🔄 독서 기록만 초기화' : '🗑️ 학생 명단 삭제'}
+                </div>
+                <h3 className="text-lg font-black text-slate-900">
+                  {deleteConfirmation.type === 'SINGLE' && (
+                    isRecordReset
+                      ? `'${deleteConfirmation.student.name}' 학생의 독서 기록 초기화`
+                      : `'${deleteConfirmation.student.name}' 학생 명단 삭제`
+                  )}
+                  {deleteConfirmation.type === 'MULTIPLE' && (
+                    isRecordReset
+                      ? `선택한 ${deleteConfirmation.count}명의 독서 기록 일괄 초기화`
+                      : `선택한 ${deleteConfirmation.count}명의 학생 명단 삭제`
+                  )}
+                  {deleteConfirmation.type === 'FILTERED' && (
+                    isRecordReset
+                      ? `${deleteConfirmation.grade} ${deleteConfirmation.className} (${deleteConfirmation.count}명) 독서 기록 초기화`
+                      : `${deleteConfirmation.grade} ${deleteConfirmation.className} 학생 (${deleteConfirmation.count}명) 명단 삭제`
+                  )}
+                  {deleteConfirmation.type === 'ALL' && (
+                    isRecordReset
+                      ? '전체 학생의 독서 기록 일괄 초기화'
+                      : '전체 학생 명단 일괄 삭제 (초기화)'
+                  )}
+                </h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  {deleteConfirmation.type === 'SINGLE' && (
+                    isRecordReset
+                      ? `${deleteConfirmation.student.grade} ${deleteConfirmation.student.className} ${deleteConfirmation.student.name} 학생의 완독 도서 및 감상평 기록만 삭제되고, 학생 명단은 유지됩니다.`
+                      : `${deleteConfirmation.student.grade} ${deleteConfirmation.student.className} ${deleteConfirmation.student.name} 학생이 명단에서 완전히 삭제됩니다.`
+                  )}
+                  {deleteConfirmation.type === 'MULTIPLE' && (
+                    isRecordReset
+                      ? `선택된 ${deleteConfirmation.count}명 학생들의 완독 도서, 별점, 감상평 기록만 삭제되며 학생 명단은 유지됩니다.`
+                      : `선택된 ${deleteConfirmation.count}명의 학생이 명단에서 완전히 삭제됩니다.`
+                  )}
+                  {deleteConfirmation.type === 'FILTERED' && (
+                    isRecordReset
+                      ? `해당 학급 학생 ${deleteConfirmation.count}명의 독서 기록만 초기화됩니다.`
+                      : `해당 학급 학생 ${deleteConfirmation.count}명이 명단에서 모두 삭제됩니다.`
+                  )}
+                  {deleteConfirmation.type === 'ALL' && (
+                    isRecordReset
+                      ? `등록된 모든 학생 (${deleteConfirmation.count}명)의 독서 기록(완독/별점/감상문)이 0권으로 초기화되며, 학생 이름과 학급 명단은 그대로 유지됩니다.`
+                      : `등록된 모든 학생 (${deleteConfirmation.count}명)의 명단 및 데이터가 완전히 삭제됩니다.`
+                  )}
+                </p>
+              </div>
+
+              {/* Mode Switcher in Modal */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs">
+                <span className="block text-[11px] font-bold text-slate-500 mb-1.5">삭제 작업 종류:</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteScopeMode('RECORDS_ONLY');
+                      setDeleteConfirmation((prev) => prev ? { ...prev, category: 'RECORDS_ONLY' } : null);
+                    }}
+                    className={`py-2 px-2 text-center rounded-xl font-bold transition-all cursor-pointer text-xs flex items-center justify-center gap-1 ${
+                      isRecordReset
+                        ? 'bg-amber-500 text-indigo-950 font-black shadow-xs'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>독서 기록만 삭제</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteScopeMode('ROSTER_ONLY');
+                      setDeleteConfirmation((prev) => prev ? { ...prev, category: 'ROSTER_ONLY' } : null);
+                    }}
+                    className={`py-2 px-2 text-center rounded-xl font-bold transition-all cursor-pointer text-xs flex items-center justify-center gap-1 ${
+                      !isRecordReset
+                        ? 'bg-rose-600 text-white font-black shadow-xs'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>학생 명단 삭제</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-rose-50 rounded-xl text-[11px] text-rose-700 font-bold text-center border border-rose-200">
+                ⚠️ {isRecordReset ? '기록 초기화 후에는 이전 감상평을 되돌릴 수 없습니다.' : '명단 삭제 시 해당 학생의 정보가 모두 사라집니다.'}
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmation(null)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  className={`flex-1 py-2.5 font-black text-xs rounded-xl transition-all cursor-pointer shadow-md ${
+                    isRecordReset
+                      ? 'bg-amber-500 hover:bg-amber-600 text-indigo-950 shadow-amber-200'
+                      : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-200'
+                  }`}
+                >
+                  {isRecordReset ? '기록 초기화 실행' : '명단 삭제 실행'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
