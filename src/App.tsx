@@ -214,9 +214,12 @@ export default function App() {
 
   // Toggle quick complete for active student
   const handleToggleComplete = (num: string) => {
+    const targetBook = books.find((b) => b.num === num);
     if (!activeStudent) {
-      showToast('독서를 기록할 학생을 먼저 선택해주세요.', 'error');
-      setActiveTab('STUDENT_LOOKUP');
+      showToast(`독서 기록을 저장할 학생 이름을 입력해주세요. ✍️`, 'info');
+      if (targetBook) {
+        setSelectedBookForDetail(targetBook);
+      }
       return;
     }
 
@@ -556,15 +559,16 @@ export default function App() {
         {/* TAB 1: 100 BOOKS EXPLORATION & RECORDING */}
         {activeTab === 'BOOKS' && (
           <main className="space-y-6">
-            {/* Real-time Student Quick Review & Star Rating Form Hero */}
+            {/* Real-time Top Rated Books Ranking & Grade-based Book Selector */}
             <QuickRecordHero
               books={books}
               students={students}
               activeStudent={activeStudent}
               onSelectStudent={handleSelectStudent}
-              onRegisterStudent={handleRegisterNewStudent}
-              onSaveRecord={handleSaveRecordForStudent}
+              onOpenBookDetail={(b) => setSelectedBookForDetail(b)}
               onStudentLogout={handleLogoutStudent}
+              selectedGradeFilter={selectedGrade}
+              onGradeFilterChange={(grade) => setSelectedGrade(grade as any)}
             />
 
             {/* Reading Statistics Overview */}
@@ -672,9 +676,15 @@ export default function App() {
         <BookDetailModal
           book={selectedBookForDetail}
           record={records[selectedBookForDetail.num]}
+          activeStudent={activeStudent}
+          students={students}
           onClose={() => setSelectedBookForDetail(null)}
-          onSaveRecord={handleSaveRecord}
+          onSaveRecordForStudent={(studentId, record) => {
+            handleSaveRecordForStudent(studentId, record);
+          }}
           onDeleteRecord={handleDeleteRecord}
+          onSelectStudent={handleSelectStudent}
+          onRegisterStudent={handleRegisterNewStudent}
         />
       )}
 

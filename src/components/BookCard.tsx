@@ -1,6 +1,6 @@
 import React from 'react';
 import { Book, ReadingRecord } from '../types';
-import { Check, Clock, BookOpen, Star, FileText } from 'lucide-react';
+import { Check, Clock, BookOpen, Star, FileText, Edit3 } from 'lucide-react';
 
 interface BookCardProps {
   book: Book;
@@ -29,13 +29,14 @@ export const BookCard: React.FC<BookCardProps> = ({
 
   return (
     <div
-      className={`group relative bg-white rounded-3xl p-5 border-2 transition-all duration-200 flex flex-col justify-between hover:-translate-y-0.5 ${
+      className={`group relative bg-white rounded-3xl p-5 border-2 transition-all duration-200 flex flex-col justify-between hover:-translate-y-0.5 notranslate ${
         isCompleted
-          ? 'border-emerald-500 bg-emerald-50/40 shadow-xs'
+          ? 'border-emerald-500 bg-emerald-50/30 shadow-xs'
           : isInProgress
-          ? 'border-amber-400 bg-amber-50/30 shadow-xs'
+          ? 'border-amber-400 bg-amber-50/20 shadow-xs'
           : 'border-slate-200 hover:border-indigo-400 hover:shadow-vibrant'
       }`}
+      translate="no"
     >
       <div>
         {/* Top Header: Book No. & Grade Badge */}
@@ -44,11 +45,9 @@ export const BookCard: React.FC<BookCardProps> = ({
             No. {book.num}
           </span>
           <span
-            className={`text-xs font-bold px-3 py-1 rounded-full border ${
-              isCompleted
-                ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                : 'bg-indigo-50 text-indigo-600 border-indigo-100'
-            }`}
+            className={`text-xs font-extrabold px-3 py-1 rounded-full border ${getGradeBadgeClass(
+              book.grade
+            )}`}
           >
             {book.grade}
           </span>
@@ -57,8 +56,8 @@ export const BookCard: React.FC<BookCardProps> = ({
         {/* Book Title */}
         <h3
           onClick={() => onOpenDetail(book)}
-          className="text-base font-extrabold text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-2 cursor-pointer mb-1.5 leading-snug"
-          title={book.title}
+          className="text-base font-black text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-2 cursor-pointer mb-1.5 leading-snug"
+          title={`${book.title} (클릭하여 독서기록 작성)`}
         >
           {book.title}
         </h3>
@@ -69,19 +68,22 @@ export const BookCard: React.FC<BookCardProps> = ({
           {book.publisher && <span className="text-slate-400"> · {book.publisher}</span>}
         </p>
 
-        {/* Rating or Review Snippet */}
+        {/* Rating or Review Snippet (if recorded) */}
         {(record?.rating || record?.review) && (
-          <div className="mb-3.5 p-2.5 bg-slate-50/90 rounded-2xl text-xs border border-slate-100">
+          <div className="mb-3.5 p-2.5 bg-slate-50 rounded-2xl text-xs border border-slate-100/90 space-y-1">
             {record.rating && (
-              <div className="flex items-center gap-0.5 text-amber-400 mb-1">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Star
-                    key={star}
-                    className={`w-3.5 h-3.5 ${
-                      star <= (record.rating || 0) ? 'fill-amber-400 text-amber-400' : 'text-slate-200'
-                    }`}
-                  />
-                ))}
+              <div className="flex items-center gap-1">
+                <div className="flex items-center text-amber-400">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      className={`w-3.5 h-3.5 ${
+                        star <= (record.rating || 0) ? 'fill-amber-400 text-amber-400' : 'text-slate-200'
+                      }`}
+                    />
+                  ))}
+                </div>
+                <span className="text-[11px] font-black text-amber-700 ml-1">{record.rating}점</span>
               </div>
             )}
             {record.review && (
@@ -92,11 +94,12 @@ export const BookCard: React.FC<BookCardProps> = ({
       </div>
 
       {/* Footer Action Buttons */}
-      <div className="pt-3 border-t border-slate-100/80 flex items-center justify-between gap-2">
+      <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
         {/* Toggle Status Button */}
         <button
+          type="button"
           onClick={() => onToggleComplete(book.num)}
-          className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
+          className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl text-xs font-black transition-all cursor-pointer ${
             isCompleted
               ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-xs'
               : isInProgress
@@ -122,13 +125,15 @@ export const BookCard: React.FC<BookCardProps> = ({
           )}
         </button>
 
-        {/* Open Reading Log Drawer/Modal Button */}
+        {/* Open Reading Log & Rating Modal Button */}
         <button
+          type="button"
           onClick={() => onOpenDetail(book)}
-          title="독서록 및 기록 작성"
-          className="p-2.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition-all border-2 border-slate-200 hover:border-indigo-200 cursor-pointer shrink-0"
+          title="독서기록 및 평점 작성"
+          className="py-2.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-2 border-indigo-200 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
         >
-          <FileText className="w-4 h-4" />
+          <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
+          <span>독서기록</span>
         </button>
       </div>
     </div>
