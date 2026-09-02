@@ -141,18 +141,16 @@ export function loadStudentsFromStorage(): Student[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_STUDENTS);
     if (!raw) {
-      // Seed default sample roster
-      saveStudentsToStorage(SAMPLE_STUDENTS);
-      return SAMPLE_STUDENTS;
+      return [];
     }
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
+    if (Array.isArray(parsed)) {
       return parsed;
     }
-    return SAMPLE_STUDENTS;
+    return [];
   } catch (e) {
     console.error('Error reading students from storage', e);
-    return SAMPLE_STUDENTS;
+    return [];
   }
 }
 

@@ -120,20 +120,24 @@ export function getTopRatedBooks(
     }
   }
 
-  // Sort by average rating (desc), then rating count (desc), then completed count (desc), then num (asc)
-  return [...filtered]
-    .filter((s) => s.averageRating > 0 || s.completedCount > 0)
-    .sort((a, b) => {
-      if (b.averageRating !== a.averageRating) {
-        return b.averageRating - a.averageRating;
-      }
-      if (b.ratingCount !== a.ratingCount) {
-        return b.ratingCount - a.ratingCount;
-      }
-      if (b.completedCount !== a.completedCount) {
-        return b.completedCount - a.completedCount;
-      }
-      return parseInt(a.num, 10) - parseInt(b.num, 10);
-    })
-    .slice(0, limit);
+  const rated = [...filtered].filter((s) => s.averageRating > 0 || s.completedCount > 0);
+  if (rated.length > 0) {
+    return rated
+      .sort((a, b) => {
+        if (b.averageRating !== a.averageRating) {
+          return b.averageRating - a.averageRating;
+        }
+        if (b.ratingCount !== a.ratingCount) {
+          return b.ratingCount - a.ratingCount;
+        }
+        if (b.completedCount !== a.completedCount) {
+          return b.completedCount - a.completedCount;
+        }
+        return parseInt(a.num, 10) - parseInt(b.num, 10);
+      })
+      .slice(0, limit);
+  }
+
+  // Fallback to top books of that category
+  return [...filtered].slice(0, limit);
 }

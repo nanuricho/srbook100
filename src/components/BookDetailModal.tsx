@@ -77,6 +77,7 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
         setQuote('');
       }
     } else {
+      setStudentName('');
       setStatus('COMPLETED');
       setRating(5);
       setCompletedDate(new Date().toISOString().split('T')[0]);
