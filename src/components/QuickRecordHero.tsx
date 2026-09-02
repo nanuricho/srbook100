@@ -62,7 +62,7 @@ export function QuickRecordHero({
 
   // Top ranked books based on selected grade
   const topBooks = useMemo(() => {
-    return getTopRatedBooks(ratingStats, selectedBookGrade, 6);
+    return getTopRatedBooks(ratingStats, selectedBookGrade, 4);
   }, [ratingStats, selectedBookGrade]);
 
   // Filter books by selected grade for the selector
