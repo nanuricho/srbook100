@@ -31,6 +31,16 @@ import {
   sendRecordToGoogleSheet,
   getFormattedNow,
 } from './utils/googleAppsScriptSync';
+import {
+  ensureAnonymousAuth,
+  subscribeToStudentsFromCloud,
+  saveStudentToCloud,
+  saveStudentRecordToCloud,
+  deleteStudentRecordFromCloud,
+  saveMultipleStudentsToCloud,
+  deleteStudentFromCloud,
+  clearAllStudentsFromCloud,
+} from './lib/firebase';
 import { BookOpen, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 
 const DEFAULT_SHEET_URL =
@@ -80,7 +90,10 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [cloudStatus, setCloudStatus] = useState<'synced' | 'syncing' | 'offline'>('syncing');
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
+
+  const initialCloudMountRef = React.useRef(true);
 
   // Active student object (null when logged out or unselected)
   const activeStudent = useMemo(() => {
@@ -110,10 +123,59 @@ export default function App() {
     }
   }, []);
 
-  // Save Students to Storage whenever students change
-  const handleUpdateStudentsList = useCallback((newStudents: Student[]) => {
+  // Real-time Cloud Synchronization via Firestore across all devices
+  useEffect(() => {
+    ensureAnonymousAuth();
+
+    const unsubscribe = subscribeToStudentsFromCloud(
+      (cloudStudents) => {
+        setCloudStatus('synced');
+        if (cloudStudents.length > 0) {
+          setStudents(cloudStudents);
+          saveStudentsToStorage(cloudStudents);
+        } else if (initialCloudMountRef.current) {
+          // If Firestore is completely empty and local storage has user-entered students, sync them to cloud
+          const local = loadStudentsFromStorage();
+          if (local.length > 0) {
+            saveMultipleStudentsToCloud(local).catch((e) => console.warn('Cloud migration note:', e));
+          }
+        }
+        initialCloudMountRef.current = false;
+      },
+      (err) => {
+        console.warn('Firestore real-time subscription status:', err);
+        setCloudStatus('offline');
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  // Save Students to Storage and Cloud
+  const handleUpdateStudentsList = useCallback(async (newStudents: Student[]) => {
+    const prevStudents = loadStudentsFromStorage();
     setStudents(newStudents);
     saveStudentsToStorage(newStudents);
+
+    setCloudStatus('syncing');
+    try {
+      if (newStudents.length === 0) {
+        await clearAllStudentsFromCloud();
+      } else {
+        const newIds = new Set(newStudents.map((s) => s.id));
+        const deleted = prevStudents.filter((s) => !newIds.has(s.id));
+        for (const d of deleted) {
+          await deleteStudentFromCloud(d.id);
+        }
+        await saveMultipleStudentsToCloud(newStudents);
+      }
+      setCloudStatus('synced');
+    } catch (err) {
+      console.error('Error syncing students update to cloud:', err);
+      setCloudStatus('offline');
+    }
   }, []);
 
   // Switch Active Student
@@ -130,17 +192,28 @@ export default function App() {
     showToast('독서 기록 및 조회를 종료하고 안전하게 나갔습니다. 👋', 'info');
   };
 
-  // Add a newly registered student and switch to them
-  const handleRegisterNewStudent = (newStudent: Student) => {
-    const updated = [newStudent, ...students];
-    handleUpdateStudentsList(updated);
+  // Add a newly registered student and switch to them (syncs to cloud)
+  const handleRegisterNewStudent = async (newStudent: Student) => {
+    const updated = [newStudent, ...students.filter((s) => s.id !== newStudent.id)];
+    setStudents(updated);
+    saveStudentsToStorage(updated);
     handleSelectStudent(newStudent);
+
+    setCloudStatus('syncing');
+    try {
+      await saveStudentToCloud(newStudent);
+      setCloudStatus('synced');
+    } catch (e) {
+      console.error('Failed to sync new student to cloud', e);
+      setCloudStatus('offline');
+    }
   };
 
-  // Delete a single student
-  const handleDeleteSingleStudent = (studentId: string, studentName: string) => {
+  // Delete a single student from local and cloud
+  const handleDeleteSingleStudent = async (studentId: string, studentName: string) => {
     const updated = students.filter((s) => s.id !== studentId);
-    handleUpdateStudentsList(updated);
+    setStudents(updated);
+    saveStudentsToStorage(updated);
 
     if (currentStudentId === studentId) {
       const nextStudent = updated[0];
@@ -154,6 +227,14 @@ export default function App() {
     }
 
     showToast(`'${studentName}' 학생이 삭제되었습니다.`, 'info');
+    setCloudStatus('syncing');
+    try {
+      await deleteStudentFromCloud(studentId);
+      setCloudStatus('synced');
+    } catch (err) {
+      console.error('Failed to delete student from cloud', err);
+      setCloudStatus('offline');
+    }
   };
 
   // Fetch CSV from Google Sheets
@@ -249,6 +330,20 @@ export default function App() {
       nextStatus === 'COMPLETED' ? 'success' : 'info'
     );
 
+    // Sync to Cloud
+    setCloudStatus('syncing');
+    saveStudentRecordToCloud(activeStudent.id, updatedRecords[num], {
+      name: activeStudent.name,
+      grade: activeStudent.grade,
+      className: activeStudent.className,
+      studentNumber: activeStudent.studentNumber,
+    })
+      .then(() => setCloudStatus('synced'))
+      .catch((err) => {
+        console.error('Failed to sync toggle to cloud', err);
+        setCloudStatus('offline');
+      });
+
     // Auto sync to Google Sheets in background
     if (nextStatus === 'COMPLETED' && activeStudent) {
       sendRecordToGoogleSheet({
@@ -290,6 +385,26 @@ export default function App() {
 
     handleUpdateStudentsList(updatedStudents);
     showToast(`'${targetName}' 학생의 No.${record.num} 도서 감상 기록이 저장되었습니다! 📝`, 'success');
+
+    // Sync to Cloud
+    setCloudStatus('syncing');
+    saveStudentRecordToCloud(
+      studentId,
+      record,
+      targetStudent
+        ? {
+            name: targetStudent.name,
+            grade: targetStudent.grade,
+            className: targetStudent.className,
+            studentNumber: targetStudent.studentNumber,
+          }
+        : undefined
+    )
+      .then(() => setCloudStatus('synced'))
+      .catch((err) => {
+        console.error('Failed to sync student record to cloud', err);
+        setCloudStatus('offline');
+      });
 
     // Auto sync to Google Sheets in background
     if (targetStudent) {
@@ -337,6 +452,14 @@ export default function App() {
 
     updateActiveStudentRecords(currentRecords);
     showToast(`No.${num} 도서 기록을 초기화했습니다.`, 'info');
+
+    setCloudStatus('syncing');
+    deleteStudentRecordFromCloud(activeStudent, num)
+      .then(() => setCloudStatus('synced'))
+      .catch((err) => {
+        console.error('Failed to delete record from cloud', err);
+        setCloudStatus('offline');
+      });
   };
 
   // Teacher Authentication Handlers
@@ -582,6 +705,7 @@ export default function App() {
           totalCount={books.length}
           isLoading={isLoading}
           isSyncing={isSyncing}
+          cloudStatus={cloudStatus}
           onRefreshData={() => fetchBooksFromCSV(sheetUrl)}
           onOpenCertificate={() => handleOpenCertificateModal()}
           onOpenSettings={() => {

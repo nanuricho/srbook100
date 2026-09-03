@@ -1,0 +1,50 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student",
+      "description": "A student profile containing their reading records and metadata",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique student identifier"
+        },
+        "grade": {
+          "type": "string",
+          "description": "Grade level e.g. 3학년"
+        },
+        "className": {
+          "type": "string",
+          "description": "Class name e.g. 1반"
+        },
+        "studentNumber": {
+          "type": "string",
+          "description": "Student attendance number e.g. 1번"
+        },
+        "name": {
+          "type": "string",
+          "description": "Student name"
+        },
+        "records": {
+          "type": "object",
+          "description": "Map of book number to ReadingRecord"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of creation"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last update"
+        }
+      },
+      "required": ["id", "grade", "className", "name"]
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": {
+      "schema": "Student",
+      "description": "Collection of students with their reading progress and reviews"
+    }
+  }
+}

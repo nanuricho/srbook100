@@ -12,6 +12,7 @@ import {
   Lock,
   Unlock,
   LogOut,
+  Cloud,
 } from 'lucide-react';
 import { getCurrentBadge } from '../utils/badges';
 import { AppTab, Student } from '../types';
@@ -24,6 +25,7 @@ interface HeaderProps {
   totalCount: number;
   isLoading: boolean;
   isSyncing: boolean;
+  cloudStatus?: 'synced' | 'syncing' | 'offline';
   onRefreshData: () => void;
   onOpenCertificate: () => void;
   onOpenSettings: () => void;
@@ -42,6 +44,7 @@ export const Header: React.FC<HeaderProps> = ({
   totalCount,
   isLoading,
   isSyncing,
+  cloudStatus = 'synced',
   onRefreshData,
   onOpenCertificate,
   onOpenSettings,
@@ -87,6 +90,26 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center gap-2 flex-wrap">
               <span className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-600 border border-indigo-100/80">
                 서룡초등학교
+              </span>
+              {/* Cloud Sync Status Badge */}
+              <span
+                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition-colors ${
+                  cloudStatus === 'synced'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : cloudStatus === 'syncing'
+                    ? 'bg-sky-50 text-sky-700 border-sky-200 animate-pulse'
+                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                }`}
+                title="모든 기기(휴대폰, 태블릿, PC) 실시간 클라우드 동기화 상태"
+              >
+                <Cloud className={`w-3 h-3 ${cloudStatus === 'syncing' ? 'animate-spin' : ''}`} />
+                <span>
+                  {cloudStatus === 'synced'
+                    ? '전 기기 실시간 동기화'
+                    : cloudStatus === 'syncing'
+                    ? '클라우드 저장 중...'
+                    : '오프라인 캐시 모드'}
+                </span>
               </span>
               {currentBadge && (
                 <span className={`inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-xs font-bold bg-gradient-to-r ${currentBadge.color} text-white shadow-xs`}>
