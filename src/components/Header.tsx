@@ -4,11 +4,8 @@ import {
   Award,
   Settings,
   RefreshCw,
-  Sparkles,
-  UserCheck,
   Users,
   Search,
-  ChevronRight,
   Lock,
   Unlock,
   LogOut,
@@ -128,45 +125,7 @@ export const Header: React.FC<HeaderProps> = ({
             </h1>
 
             <div className="text-xs font-medium text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
-              {activeStudent ? (
-                <div className="inline-flex items-center gap-2 bg-indigo-50/90 px-3 py-1 rounded-2xl border border-indigo-200/80 text-slate-700 shadow-2xs">
-                  <UserCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                  <span className="font-extrabold text-indigo-950">
-                    {activeStudent.grade} {activeStudent.className} {activeStudent.studentNumber ? `${activeStudent.studentNumber} ` : ''}{activeStudent.name}
-                  </span>
-                  <div className="flex items-center gap-1.5 ml-1 border-l border-indigo-200 pl-2">
-                    <button
-                      type="button"
-                      onClick={() => onChangeTab('STUDENT_LOOKUP')}
-                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
-                    >
-                      조회/변경
-                    </button>
-                    <span className="text-slate-300 text-[10px]">·</span>
-                    <button
-                      type="button"
-                      onClick={onStudentLogout}
-                      className="px-2 py-0.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-[11px] font-black transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-                      title="학생 기록 종료 및 이름 숨기기"
-                    >
-                      <LogOut className="w-3 h-3" />
-                      <span>나가기</span>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="inline-flex items-center gap-2 flex-wrap">
-                  <span className="text-slate-500">서룡초등학교 어린이를 위한 전자 독서 기록장</span>
-                  <button
-                    type="button"
-                    onClick={() => onChangeTab('STUDENT_LOOKUP')}
-                    className="px-2.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
-                  >
-                    <Search className="w-3 h-3 text-indigo-600" />
-                    <span>내 이름으로 조회/기록</span>
-                  </button>
-                </div>
-              )}
+              <span className="text-slate-500">서룡초등학교 어린이를 위한 전자 독서 기록장</span>
             </div>
           </div>
         </div>

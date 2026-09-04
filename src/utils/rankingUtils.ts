@@ -12,6 +12,12 @@ export interface BookRatingStat {
     rating?: number;
     review: string;
   }[];
+  allReviews: {
+    studentName: string;
+    studentGrade: string;
+    rating?: number;
+    review: string;
+  }[];
 }
 
 /**
@@ -80,6 +86,7 @@ export function calculateBookRatingStats(books: Book[], students: Student[]): Bo
         ratingCount: 0,
         completedCount: 0,
         topReviews: [],
+        allReviews: [],
       });
       return;
     }
@@ -97,6 +104,7 @@ export function calculateBookRatingStats(books: Book[], students: Student[]): Bo
       ratingCount,
       completedCount: data.completedCount,
       topReviews: data.reviews.slice(0, 3),
+      allReviews: data.reviews,
     });
   });
 

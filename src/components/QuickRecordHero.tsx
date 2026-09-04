@@ -1,31 +1,29 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Book, Student } from '../types';
 import {
-  Trophy,
-  BookOpen,
   Star,
-  Search,
   User,
   LogOut,
   Sparkles,
-  ArrowRight,
   TrendingUp,
-  Award,
-  ChevronRight,
-  MessageSquareQuote,
-  Flame,
+  ArrowRight,
+  BookOpen,
+  MessageSquare,
 } from 'lucide-react';
-import { calculateBookRatingStats, getTopRatedBooks, BookRatingStat } from '../utils/rankingUtils';
+import { BookRatingStat, calculateBookRatingStats, getTopRatedBooks } from '../utils/rankingUtils';
+import { BookReviewsModal } from './BookReviewsModal';
 
 interface QuickRecordHeroProps {
   books: Book[];
   students: Student[];
   activeStudent: Student | null;
   onSelectStudent: (student: Student) => void;
+  onRegisterStudent?: (newStudent: Student) => void;
   onOpenBookDetail: (book: Book) => void;
   onStudentLogout?: () => void;
   selectedGradeFilter: string;
   onGradeFilterChange: (grade: string) => void;
+  onNavigateToBooksList?: () => void;
 }
 
 export function QuickRecordHero({
@@ -33,27 +31,121 @@ export function QuickRecordHero({
   students,
   activeStudent,
   onSelectStudent,
+  onRegisterStudent,
   onOpenBookDetail,
   onStudentLogout,
   selectedGradeFilter,
   onGradeFilterChange,
+  onNavigateToBooksList,
 }: QuickRecordHeroProps) {
-  // Book Selection state
-  const [selectedBookGrade, setSelectedBookGrade] = useState<string>('ALL');
-  const [selectedBookNum, setSelectedBookNum] = useState<string>('1');
-  const [bookSearchQuery, setBookSearchQuery] = useState<string>('');
+  // Student Input State
+  const [inputGrade, setInputGrade] = useState<string>(
+    activeStudent?.grade || (selectedGradeFilter !== 'ALL' && selectedGradeFilter ? selectedGradeFilter : '1학년')
+  );
+  const [inputClass, setInputClass] = useState<string>(
+    activeStudent?.className ? activeStudent.className.replace('반', '') : ''
+  );
+  const [inputNumber, setInputNumber] = useState<string>(
+    activeStudent?.studentNumber ? activeStudent.studentNumber.replace('번', '') : ''
+  );
+  const [inputName, setInputName] = useState<string>(activeStudent?.name || '');
+  const [selectedReviewStat, setSelectedReviewStat] = useState<BookRatingStat | null>(null);
 
-  // Available grades for books
-  const BOOK_GRADES = [
-    { label: '전체', value: 'ALL' },
-    { label: '1학년', value: '1학년' },
-    { label: '2학년', value: '2학년' },
-    { label: '3학년', value: '3학년' },
-    { label: '4학년', value: '4학년' },
-    { label: '5학년', value: '5학년' },
-    { label: '6학년', value: '6학년' },
-    { label: '공통/전학년', value: '공통' },
-  ];
+  // Sync state when activeStudent changes
+  useEffect(() => {
+    if (activeStudent) {
+      setInputGrade(activeStudent.grade || '1학년');
+      setInputClass(activeStudent.className ? activeStudent.className.replace('반', '') : '');
+      setInputNumber(activeStudent.studentNumber ? activeStudent.studentNumber.replace('번', '') : '');
+      setInputName(activeStudent.name || '');
+    } else {
+      // 학생이 접속 후 나가면 기록된 반, 번호, 이름 초기화
+      setInputClass('');
+      setInputNumber('');
+      setInputName('');
+    }
+  }, [activeStudent]);
+
+  // Sync with selectedGradeFilter if not 'ALL'
+  useEffect(() => {
+    if (selectedGradeFilter && selectedGradeFilter !== 'ALL') {
+      setInputGrade(selectedGradeFilter);
+    }
+  }, [selectedGradeFilter]);
+
+  // Available grades for student profile
+  const GRADES = ['1학년', '2학년', '3학년', '4학년', '5학년', '6학년'];
+
+  // Scroll helper to smoothly scroll to the book cards list
+  const scrollToBooks = () => {
+    setTimeout(() => {
+      const el = document.getElementById('books-section');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 80);
+  };
+
+  // Handle student grade change: updates inputGrade
+  const handleGradeSelect = (grade: string) => {
+    setInputGrade(grade);
+  };
+
+  // Connect or register student, then navigate directly to chosen grade's book cards
+  const handleApplyAndConnect = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmedName = inputName.trim();
+    if (!trimmedName) {
+      alert('학생 이름을 입력해주세요.');
+      return;
+    }
+
+    const normClass = inputClass ? (inputClass.includes('반') ? inputClass : `${inputClass}반`) : '1반';
+    const normNumber = inputNumber ? (inputNumber.includes('번') ? inputNumber : `${inputNumber}번`) : '1번';
+
+    // Find existing student
+    const existing = students.find(
+      (s) => s.name === trimmedName && s.grade === inputGrade && s.className === normClass
+    ) || students.find((s) => s.name === trimmedName);
+
+    if (existing) {
+      const updated = {
+        ...existing,
+        grade: inputGrade,
+        className: normClass,
+        studentNumber: normNumber || existing.studentNumber,
+      };
+      onSelectStudent(updated);
+    } else if (onRegisterStudent) {
+      const newId = `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(-4)}`;
+      const newStudent: Student = {
+        id: newId,
+        grade: inputGrade,
+        className: normClass,
+        studentNumber: normNumber,
+        name: trimmedName,
+        records: {},
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      onRegisterStudent(newStudent);
+    }
+
+    // Set filter to the chosen grade
+    onGradeFilterChange(inputGrade);
+
+    // Call optional navigation callback or scroll to the book card grid
+    if (onNavigateToBooksList) {
+      onNavigateToBooksList();
+    } else {
+      scrollToBooks();
+    }
+  };
+
+  // Count books in selected grade
+  const gradeBooksCount = useMemo(() => {
+    return books.filter((b) => b.grade.includes(inputGrade)).length;
+  }, [books, inputGrade]);
 
   // Calculate real-time rating statistics
   const ratingStats = useMemo(() => {
@@ -62,99 +154,49 @@ export function QuickRecordHero({
 
   // Top ranked books based on selected grade
   const topBooks = useMemo(() => {
-    return getTopRatedBooks(ratingStats, selectedBookGrade, 4);
-  }, [ratingStats, selectedBookGrade]);
-
-  // Filter books by selected grade for the selector
-  const gradeFilteredBooks = useMemo(() => {
-    if (selectedBookGrade === 'ALL') return books;
-    if (selectedBookGrade === '공통') {
-      return books.filter((b) => b.grade.includes('공통') || b.grade.includes('전학년') || b.grade.includes('후반'));
-    }
-    return books.filter((b) => b.grade.includes(selectedBookGrade));
-  }, [books, selectedBookGrade]);
-
-  const searchFilteredBooks = useMemo(() => {
-    const q = bookSearchQuery.trim().toLowerCase();
-    if (!q) return gradeFilteredBooks;
-    return gradeFilteredBooks.filter(
-      (b) =>
-        b.title.toLowerCase().includes(q) ||
-        b.author.toLowerCase().includes(q) ||
-        b.num.includes(q) ||
-        b.grade.toLowerCase().includes(q)
-    );
-  }, [gradeFilteredBooks, bookSearchQuery]);
-
-  // Current selected book from dropdown
-  const currentSelectedBook = useMemo(() => {
-    return books.find((b) => b.num === selectedBookNum) || gradeFilteredBooks[0] || books[0] || null;
-  }, [books, selectedBookNum, gradeFilteredBooks]);
-
-  // Stat for selected book
-  const selectedBookStat = useMemo(() => {
-    if (!currentSelectedBook) return null;
-    return ratingStats.find((s) => s.num === currentSelectedBook.num) || null;
-  }, [currentSelectedBook, ratingStats]);
-
-  const handleGradeChange = (gradeVal: string) => {
-    setSelectedBookGrade(gradeVal);
-    onGradeFilterChange(gradeVal);
-
-    // Auto select first book in that grade
-    const firstBook =
-      gradeVal === 'ALL'
-        ? books[0]
-        : gradeVal === '공통'
-        ? books.find((b) => b.grade.includes('공통') || b.grade.includes('전학년'))
-        : books.find((b) => b.grade.includes(gradeVal));
-    if (firstBook) {
-      setSelectedBookNum(firstBook.num);
-    }
-  };
+    return getTopRatedBooks(ratingStats, inputGrade, 4);
+  }, [ratingStats, inputGrade]);
 
   return (
-    <div className="bg-gradient-to-br from-indigo-950 via-indigo-900 to-slate-900 text-white rounded-3xl p-5 md:p-7 shadow-vibrant mb-7 relative overflow-hidden notranslate border border-indigo-800/60" translate="no">
+    <div
+      className="bg-gradient-to-br from-indigo-950 via-indigo-900 to-slate-900 text-white rounded-3xl p-5 md:p-7 shadow-vibrant mb-7 relative overflow-hidden notranslate border border-indigo-800/60"
+      translate="no"
+    >
       {/* Subtle background glow */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="relative z-10 space-y-6">
-        {/* Header Row: Title & Active Student Status */}
+      <div className="relative z-10 space-y-5">
+        {/* Top Header: Title */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-indigo-700/50 pb-4">
           <div>
-            <div className="flex items-center gap-2 flex-wrap mb-1.5">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 text-xs font-black border border-amber-300/30 shadow-xs">
-                <Trophy className="w-3.5 h-3.5 text-amber-300" />
-                <span>서룡초 어린이 실시간 독서 랭킹 & 탐색</span>
-              </div>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-bold border border-emerald-400/30">
-                <Flame className="w-3 h-3 text-amber-400 animate-pulse" />
-                <span>학생 평점 실시간 집계 중</span>
-              </div>
-            </div>
             <h2 className="text-xl md:text-2xl font-black text-white tracking-tight flex items-center gap-2">
-              ⭐ 실시간 최고 평점 도서 순위 & 학년별 도서 선택
+              📖 독서 후기 남기기
             </h2>
-            <p className="text-xs text-indigo-200 mt-0.5 font-medium">
-              서룡초 학생들이 직접 읽고 남긴 별점 순위입니다. 학년별 도서를 선택하거나 순위 도서를 클릭해 독서기록을 남겨보세요!
+            <p className="text-xs text-indigo-200 mt-1 font-medium">
+              학년 반 번호 이름을 입력하세요.
             </p>
           </div>
 
-          {/* Active Student Badge or Guide */}
+          {/* Active Student Status */}
           {activeStudent ? (
             <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/20 text-xs shadow-xs shrink-0 self-start md:self-auto">
               <User className="w-3.5 h-3.5 text-amber-300" />
-              <span className="text-indigo-200 font-medium">현재 접속:</span>
+              <span className="text-indigo-200 font-medium">접속 학생:</span>
               <span className="font-black text-amber-300">
-                {activeStudent.grade} {activeStudent.className} {activeStudent.name}
+                {activeStudent.grade} {activeStudent.className} {activeStudent.studentNumber || ''} {activeStudent.name}
               </span>
               {onStudentLogout && (
                 <button
                   type="button"
-                  onClick={onStudentLogout}
+                  onClick={() => {
+                    setInputClass('');
+                    setInputNumber('');
+                    setInputName('');
+                    onStudentLogout();
+                  }}
                   className="ml-1.5 px-2 py-0.5 bg-rose-500/80 hover:bg-rose-600 active:bg-rose-700 text-white rounded-lg text-[10px] font-black transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-                  title="기록 종료 및 이름 숨기기"
+                  title="접속 종료 및 학생 나가기"
                 >
                   <LogOut className="w-3 h-3" />
                   <span>나가기</span>
@@ -162,145 +204,125 @@ export function QuickRecordHero({
               )}
             </div>
           ) : (
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/15 text-xs text-indigo-200 shrink-0 self-start md:self-auto">
+            <div className="inline-flex items-center gap-2 bg-amber-400/20 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-amber-300/30 text-xs text-amber-200 shrink-0 self-start md:self-auto">
               <User className="w-3.5 h-3.5 text-amber-300" />
-              <span>도서 카드에서 [독서기록]을 눌러 기록을 시작하세요</span>
+              <span className="font-bold">학년 · 반 · 번호 · 이름을 입력해 주세요</span>
             </div>
           )}
         </div>
 
-        {/* 2-Column Content Layout: Left = Book Selector, Right = Top Rated Ranking */}
+        {/* 2-Column Layout: Left = Student Login & Grade Access, Right = Top 4 Books Ranking */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          {/* LEFT: Grade & Book Selector (5 cols) */}
-          <div className="lg:col-span-5 bg-white/10 backdrop-blur-md p-4 md:p-5 rounded-2xl border border-white/15 flex flex-col justify-between space-y-4">
-            <div>
-              <div className="flex items-center justify-between mb-2.5">
+          {/* LEFT: Student Info & Direct Grade Access Form (7 cols) */}
+          <div className="lg:col-span-7 bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/15 flex flex-col justify-between space-y-4">
+            <div className="space-y-4">
+              {/* Header inside Student Box */}
+              <div className="flex items-center justify-between">
                 <span className="text-xs font-black text-amber-300 flex items-center gap-1.5">
-                  <BookOpen className="w-4 h-4" /> 도서 선택 (학년별 목록)
-                </span>
-                <span className="text-[11px] text-indigo-200 font-medium">
-                  총 <strong className="text-white font-bold">{books.length}</strong>권 중
+                  <User className="w-4 h-4 text-amber-300" />
+                  <span>학생 정보 입력 및 접속</span>
                 </span>
               </div>
 
-              {/* 1. Grade Selector Pills */}
-              <div className="mb-3">
-                <div className="text-[11px] text-indigo-200 font-bold mb-1.5 flex items-center justify-between">
-                  <span>① 도서 학년 선택:</span>
-                  <span className="text-amber-300 text-[10px]">선택 학년: {gradeFilteredBooks.length}권</span>
+              {/* 1. Grade Selection Buttons (1학년 ~ 6학년) */}
+              <div>
+                <div className="text-xs text-indigo-200 font-bold mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <span className="w-4 h-4 rounded-full bg-amber-400 text-indigo-950 font-black text-[10px] inline-flex items-center justify-center">
+                      1
+                    </span>
+                    <span>학년을 선택하세요:</span>
+                  </span>
+                  <span className="text-amber-300 text-[11px] font-bold">
+                    {inputGrade} 권장도서 {gradeBooksCount}권
+                  </span>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {BOOK_GRADES.map((bg) => (
+                <div className="grid grid-cols-6 gap-2">
+                  {GRADES.map((g) => (
                     <button
-                      key={bg.value}
+                      key={g}
                       type="button"
-                      onClick={() => handleGradeChange(bg.value)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                        selectedBookGrade === bg.value
-                          ? 'bg-amber-400 text-indigo-950 border-amber-300 font-black shadow-xs'
-                          : 'bg-indigo-950/70 text-indigo-200 border-indigo-700/50 hover:bg-indigo-900/70'
+                      onClick={() => handleGradeSelect(g)}
+                      className={`py-2 rounded-xl text-xs font-black transition-all cursor-pointer border text-center ${
+                        inputGrade === g
+                          ? 'bg-amber-400 text-indigo-950 border-amber-300 shadow-md scale-105 ring-2 ring-amber-300/40'
+                          : 'bg-indigo-950/80 text-indigo-200 border-indigo-700/60 hover:bg-indigo-900 hover:border-amber-400/50'
                       }`}
                     >
-                      {bg.label}
+                      {g}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* 2. Book Dropdown & Quick Search */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-[11px] text-indigo-200 font-bold">
-                  <span>② 해당 학년 도서 목록 선택:</span>
-                  {searchFilteredBooks.length !== gradeFilteredBooks.length && (
-                    <span className="text-amber-300 text-[10px]">검색 결과 {searchFilteredBooks.length}권</span>
-                  )}
+              {/* 2. Class, Number, Name Inputs */}
+              <form onSubmit={handleApplyAndConnect} className="space-y-3">
+                <div className="text-xs text-indigo-200 font-bold flex items-center gap-1">
+                  <span className="w-4 h-4 rounded-full bg-amber-400 text-indigo-950 font-black text-[10px] inline-flex items-center justify-center">
+                    2
+                  </span>
+                  <span>반, 번호, 이름을 입력하세요:</span>
                 </div>
 
-                {/* Dropdown Select */}
-                <select
-                  value={selectedBookNum}
-                  onChange={(e) => setSelectedBookNum(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-indigo-950/95 border-2 border-indigo-400/60 rounded-xl text-xs font-bold text-white focus:outline-hidden focus:border-amber-400 cursor-pointer shadow-inner"
-                >
-                  {gradeFilteredBooks.map((b) => {
-                    const stat = ratingStats.find((s) => s.num === b.num);
-                    const ratingStr = stat && stat.averageRating > 0 ? ` [⭐ ${stat.averageRating}]` : '';
-                    return (
-                      <option key={b.num} value={b.num} className="bg-slate-900 text-white py-1">
-                        No.{b.num} [{b.grade}] {b.title} - {b.author} {ratingStr}
-                      </option>
-                    );
-                  })}
-                </select>
-
-                {/* Search input */}
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400" />
-                  <input
-                    type="text"
-                    value={bookSearchQuery}
-                    onChange={(e) => setBookSearchQuery(e.target.value)}
-                    placeholder="도서명 또는 작가 검색..."
-                    className="w-full pl-8.5 pr-3 py-2 bg-indigo-950/90 border border-indigo-400/40 rounded-xl text-xs text-white placeholder:text-indigo-400/60 focus:outline-hidden focus:border-amber-400"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Selected Book Quick Action Preview Box */}
-            {currentSelectedBook && (
-              <div className="bg-indigo-950/90 p-3.5 rounded-2xl border border-indigo-700/80 space-y-2.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <span className="px-2 py-0.5 bg-amber-400 text-indigo-950 font-black rounded-md text-[10px]">
-                        No.{currentSelectedBook.num}
-                      </span>
-                      <span className="px-2 py-0.5 bg-indigo-800 text-indigo-200 font-bold rounded text-[10px]">
-                        {currentSelectedBook.grade}
-                      </span>
-                    </div>
-                    <h3 className="font-black text-sm text-white line-clamp-1">
-                      {currentSelectedBook.title}
-                    </h3>
-                    <p className="text-[11px] text-indigo-300 truncate">
-                      {currentSelectedBook.author} · {currentSelectedBook.publisher}
-                    </p>
+                <div className="grid grid-cols-12 gap-2.5 items-end">
+                  <div className="col-span-3 sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-indigo-300 mb-1">반</label>
+                    <input
+                      type="text"
+                      value={inputClass}
+                      onChange={(e) => setInputClass(e.target.value)}
+                      placeholder="1반"
+                      className="w-full px-3 py-2 bg-indigo-950/90 border border-indigo-500/60 rounded-xl text-xs font-bold text-white placeholder:text-indigo-400/50 focus:outline-hidden focus:border-amber-400 shadow-inner"
+                    />
                   </div>
 
-                  {/* Rating Tag */}
-                  {selectedBookStat && selectedBookStat.averageRating > 0 ? (
-                    <div className="bg-amber-400/20 px-2.5 py-1 rounded-xl border border-amber-300/30 text-right shrink-0">
-                      <div className="flex items-center gap-1 text-amber-300 font-black text-xs">
-                        <Star className="w-3.5 h-3.5 fill-amber-300" />
-                        <span>{selectedBookStat.averageRating}점</span>
-                      </div>
-                      <span className="text-[10px] text-indigo-200">
-                        {selectedBookStat.ratingCount}명 평가
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-[10px] text-indigo-300 bg-white/5 px-2 py-1 rounded-lg shrink-0">
-                      첫 평가 대기 중
-                    </span>
-                  )}
-                </div>
+                  <div className="col-span-3 sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-indigo-300 mb-1">번호</label>
+                    <input
+                      type="text"
+                      value={inputNumber}
+                      onChange={(e) => setInputNumber(e.target.value)}
+                      placeholder="1번"
+                      className="w-full px-3 py-2 bg-indigo-950/90 border border-indigo-500/60 rounded-xl text-xs font-bold text-white placeholder:text-indigo-400/50 focus:outline-hidden focus:border-amber-400 shadow-inner"
+                    />
+                  </div>
 
-                <button
-                  type="button"
-                  onClick={() => onOpenBookDetail(currentSelectedBook)}
-                  className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-200 active:from-amber-500 text-indigo-950 font-black text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <BookOpen className="w-4 h-4" />
-                  <span>이 책 선택하여 독서기록 & 별점 작성하기</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
+                  <div className="col-span-6 sm:col-span-5">
+                    <label className="block text-[10px] font-bold text-indigo-300 mb-1">이름 (필수)</label>
+                    <input
+                      type="text"
+                      required
+                      value={inputName}
+                      onChange={(e) => setInputName(e.target.value)}
+                      placeholder="이름 입력"
+                      className="w-full px-3.5 py-2 bg-indigo-950/90 border-2 border-amber-400/70 focus:border-amber-300 rounded-xl text-xs font-black text-amber-300 placeholder:text-indigo-400/50 focus:outline-hidden shadow-inner"
+                    />
+                  </div>
+
+                  <div className="col-span-12 sm:col-span-3">
+                    <button
+                      type="submit"
+                      className="w-full py-2 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 hover:from-amber-300 hover:to-amber-200 active:from-amber-500 text-indigo-950 font-black text-xs rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-indigo-950" />
+                      <span>접속하기</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-indigo-950" />
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            <div className="pt-2 border-t border-indigo-700/40 flex items-center justify-between text-[11px] text-indigo-200">
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                접속 후 도서 카드에서 <strong className="text-white">완독 체크</strong>와 <strong className="text-amber-300">독서기록(별점·한줄평)</strong>을 바로 남길 수 있습니다.
+              </span>
+            </div>
           </div>
 
-          {/* RIGHT: Top Rated Books Ranking Board (7 cols) */}
-          <div className="lg:col-span-7 bg-white/10 backdrop-blur-md p-4 md:p-5 rounded-2xl border border-white/15 flex flex-col justify-between space-y-3.5">
+          {/* RIGHT: Top Rated Books Ranking Board (5 cols) */}
+          <div className="lg:col-span-5 bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/15 flex flex-col justify-between space-y-3.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 bg-amber-400/20 rounded-lg text-amber-300 border border-amber-400/30">
@@ -308,21 +330,21 @@ export function QuickRecordHero({
                 </div>
                 <div>
                   <span className="text-xs font-black text-amber-300">
-                    🏆 서룡초 최고 평점 인기 도서 TOP 순위
+                    🏆 서룡초 최고 평점 도서 TOP 4
                   </span>
                   <span className="text-[10px] text-indigo-200 block">
-                    {selectedBookGrade === 'ALL' ? '전체 학년' : selectedBookGrade} 기준 학생들이 추천한 명작 도서
+                    [{inputGrade}] 학생 추천 인기 도서
                   </span>
                 </div>
               </div>
 
-              <span className="text-[11px] font-bold text-amber-300 bg-indigo-950/80 px-2.5 py-1 rounded-lg border border-indigo-700/60">
-                실시간 업데이트
+              <span className="text-[10px] font-bold text-amber-300 bg-indigo-950/80 px-2 py-0.5 rounded-lg border border-indigo-700/60">
+                실시간
               </span>
             </div>
 
             {/* Ranking Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2.5">
               {topBooks.length > 0 ? (
                 topBooks.map((item, index) => {
                   const isTop1 = index === 0;
@@ -332,7 +354,7 @@ export function QuickRecordHero({
                   return (
                     <div
                       key={item.num}
-                      onClick={() => onOpenBookDetail(item.book)}
+                      onClick={() => setSelectedReviewStat(item)}
                       className={`group relative p-3 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
                         isTop1
                           ? 'bg-gradient-to-br from-amber-500/25 to-indigo-950/90 border-amber-400/60 hover:border-amber-300 shadow-md hover:-translate-y-0.5'
@@ -348,7 +370,7 @@ export function QuickRecordHero({
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-1.5">
                             <span
-                              className={`w-6 h-6 rounded-lg text-xs font-black flex items-center justify-center shadow-xs ${
+                              className={`w-5 h-5 rounded-lg text-[11px] font-black flex items-center justify-center shadow-xs ${
                                 isTop1
                                   ? 'bg-amber-400 text-indigo-950'
                                   : isTop2
@@ -380,11 +402,9 @@ export function QuickRecordHero({
                       </div>
 
                       {/* Rating & Action Row */}
-                      <div className="mt-2.5 pt-2 border-t border-white/10 flex items-center justify-between gap-1">
+                      <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center justify-between gap-1">
                         <div className="flex items-center gap-1">
-                          <div className="flex items-center text-amber-400">
-                            <Star className="w-3.5 h-3.5 fill-amber-400" />
-                          </div>
+                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                           <span className="text-xs font-black text-amber-300">
                             {item.averageRating > 0 ? `${item.averageRating}점` : '5.0점'}
                           </span>
@@ -393,30 +413,39 @@ export function QuickRecordHero({
                           </span>
                         </div>
 
-                        <span className="text-[10px] font-bold text-amber-300 group-hover:underline flex items-center">
-                          기록하기 <ChevronRight className="w-3 h-3" />
+                        <span className="text-[10px] font-bold text-amber-300/90 group-hover:text-amber-200 flex items-center gap-1">
+                          <MessageSquare className="w-3 h-3" />
+                          <span>평점·한줄평 보기</span>
                         </span>
                       </div>
                     </div>
                   );
                 })
               ) : (
-                <div className="col-span-2 py-8 text-center text-indigo-300 text-xs">
-                  등록된 평점 정보가 없습니다. 아래 도서 카드에서 첫 평점을 매겨보세요!
+                <div className="py-6 text-center text-indigo-300 text-xs">
+                  등록된 평점 정보가 없습니다. 도서명을 클릭하여 첫 평점을 남겨보세요!
                 </div>
               )}
             </div>
 
-            {/* Bottom Info Banner */}
+            {/* Bottom Info */}
             <div className="bg-indigo-950/60 px-3.5 py-2 rounded-xl border border-indigo-800/40 flex items-center justify-between text-[11px] text-indigo-200">
               <span className="flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                도서 카드에서 <strong className="text-white font-bold">[완독/독서기록]</strong>을 누르면 평점이 순위에 즉시 반영됩니다!
+                도서명을 클릭하면 해당 도서의 평점과 친구들의 한줄평을 확인할 수 있습니다.
               </span>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Book Reviews & Rating Modal */}
+      {selectedReviewStat && (
+        <BookReviewsModal
+          stat={selectedReviewStat}
+          onClose={() => setSelectedReviewStat(null)}
+        />
+      )}
     </div>
   );
 }

@@ -39,12 +39,44 @@
         }
       },
       "required": ["id", "grade", "className", "name"]
+    },
+    "ClassPassword": {
+      "title": "ClassPassword",
+      "description": "Teacher password entry for each class or master admin",
+      "type": "object",
+      "properties": {
+        "classKey": {
+          "type": "string",
+          "description": "Class identifier e.g. 4학년_2반 or MASTER"
+        },
+        "grade": {
+          "type": "string",
+          "description": "Grade e.g. 4학년"
+        },
+        "className": {
+          "type": "string",
+          "description": "Class e.g. 2반"
+        },
+        "passwordHash": {
+          "type": "string",
+          "description": "Encoded password hash"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last update"
+        }
+      },
+      "required": ["classKey", "passwordHash"]
     }
   },
   "firestore": {
     "/students/{studentId}": {
       "schema": "Student",
       "description": "Collection of students with their reading progress and reviews"
+    },
+    "/class_passwords/{classKey}": {
+      "schema": "ClassPassword",
+      "description": "Collection of individual teacher passwords per class"
     }
   }
 }

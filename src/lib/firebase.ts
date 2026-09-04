@@ -264,3 +264,72 @@ export async function clearAllStudentsFromCloud(): Promise<void> {
     throw e;
   }
 }
+
+const CLASS_PASSWORDS_COLLECTION = 'class_passwords';
+
+export interface CloudClassPassword {
+  classKey: string;
+  grade: string;
+  className: string;
+  passwordHash: string;
+  updatedAt: string;
+}
+
+/**
+ * Save or update an individual class password in Firestore
+ */
+export async function saveClassPasswordToCloud(
+  classKey: string,
+  grade: string,
+  className: string,
+  passwordHash: string
+): Promise<void> {
+  try {
+    const ref = doc(db, CLASS_PASSWORDS_COLLECTION, classKey);
+    const payload: CloudClassPassword = {
+      classKey,
+      grade,
+      className,
+      passwordHash,
+      updatedAt: new Date().toISOString(),
+    };
+    await setDoc(ref, payload, { merge: true });
+  } catch (e) {
+    console.error(`Failed to save class password for ${classKey} to cloud`, e);
+    // don't throw to allow offline/local fallback
+  }
+}
+
+/**
+ * Fetch all class passwords from Firestore
+ */
+export async function fetchClassPasswordsFromCloud(): Promise<Record<string, string>> {
+  try {
+    const col = collection(db, CLASS_PASSWORDS_COLLECTION);
+    const snapshot = await getDocs(col);
+    const result: Record<string, string> = {};
+    snapshot.forEach((d) => {
+      const data = d.data() as Partial<CloudClassPassword>;
+      if (data.classKey && data.passwordHash) {
+        result[data.classKey] = data.passwordHash;
+      }
+    });
+    return result;
+  } catch (e) {
+    console.warn('Failed to fetch class passwords from cloud, using local storage cache', e);
+    return {};
+  }
+}
+
+/**
+ * Delete a class password from Firestore (reset)
+ */
+export async function deleteClassPasswordFromCloud(classKey: string): Promise<void> {
+  try {
+    const ref = doc(db, CLASS_PASSWORDS_COLLECTION, classKey);
+    await deleteDoc(ref);
+  } catch (e) {
+    console.error(`Failed to delete class password for ${classKey} from cloud`, e);
+  }
+}
+

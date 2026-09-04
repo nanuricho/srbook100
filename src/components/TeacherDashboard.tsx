@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Book, Student, ReadingRecord } from '../types';
 import {
   parseBatchStudentInput,
@@ -19,6 +19,7 @@ import {
   saveGoogleScriptUrl,
   DEFAULT_GAS_WEBAPP_URL,
 } from '../utils/googleAppsScriptSync';
+import { TeacherSession } from '../utils/teacherAuth';
 import {
   Users,
   Upload,
@@ -54,6 +55,8 @@ import {
   Lock,
   LogOut,
   KeyRound,
+  School,
+  Crown,
 } from 'lucide-react';
 
 interface TeacherDashboardProps {
@@ -65,6 +68,7 @@ interface TeacherDashboardProps {
   currentStudentId: string | null;
   onLockTeacherMode?: () => void;
   onOpenPasswordChange?: () => void;
+  teacherSession?: TeacherSession | null;
 }
 
 type DeleteTargetCategory = 'ROSTER_ONLY' | 'RECORDS_ONLY' | 'ALL';
@@ -84,11 +88,22 @@ export function TeacherDashboard({
   currentStudentId,
   onLockTeacherMode,
   onOpenPasswordChange,
+  teacherSession,
 }: TeacherDashboardProps) {
   // Navigation & Sub-views
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'ROSTER' | 'BATCH_UPLOAD' | 'GAS_SYNC'>('OVERVIEW');
-  const [selectedGradeFilter, setSelectedGradeFilter] = useState<string>('ALL');
-  const [selectedClassFilter, setSelectedClassFilter] = useState<string>('ALL');
+  const [selectedGradeFilter, setSelectedGradeFilter] = useState<string>(() => {
+    if (teacherSession?.role === 'CLASS_TEACHER' && teacherSession.grade) {
+      return teacherSession.grade;
+    }
+    return 'ALL';
+  });
+  const [selectedClassFilter, setSelectedClassFilter] = useState<string>(() => {
+    if (teacherSession?.role === 'CLASS_TEACHER' && teacherSession.className) {
+      return teacherSession.className;
+    }
+    return 'ALL';
+  });
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortOption, setSortOption] = useState<'READ_DESC' | 'NUM_ASC' | 'NAME_ASC' | 'DATE_DESC'>('READ_DESC');
 
@@ -111,8 +126,28 @@ export function TeacherDashboard({
 
   // Batch Upload States
   const [batchText, setBatchText] = useState<string>('');
-  const [batchDefaultGrade, setBatchDefaultGrade] = useState<string>('3학년');
-  const [batchDefaultClass, setBatchDefaultClass] = useState<string>('1반');
+  const [batchDefaultGrade, setBatchDefaultGrade] = useState<string>(() => {
+    if (teacherSession?.role === 'CLASS_TEACHER' && teacherSession.grade) {
+      return teacherSession.grade;
+    }
+    return '3학년';
+  });
+  const [batchDefaultClass, setBatchDefaultClass] = useState<string>(() => {
+    if (teacherSession?.role === 'CLASS_TEACHER' && teacherSession.className) {
+      return teacherSession.className;
+    }
+    return '1반';
+  });
+
+  // Automatically adapt filters when session switches
+  useEffect(() => {
+    if (teacherSession?.role === 'CLASS_TEACHER' && teacherSession.grade && teacherSession.className) {
+      setSelectedGradeFilter(teacherSession.grade);
+      setSelectedClassFilter(teacherSession.className);
+      setBatchDefaultGrade(teacherSession.grade);
+      setBatchDefaultClass(teacherSession.className);
+    }
+  }, [teacherSession]);
   const [batchImportMode, setBatchImportMode] = useState<'APPEND' | 'REPLACE'>('APPEND');
   const [uploadSuccessMessage, setUploadSuccessMessage] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState<boolean>(false);
@@ -569,6 +604,17 @@ export function TeacherDashboard({
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-xs font-bold text-indigo-200 backdrop-blur-md border border-white/10">
                 <Users className="w-3.5 h-3.5" /> 교사용 관리 대시보드
               </div>
+              {teacherSession?.role === 'CLASS_TEACHER' && teacherSession.grade && teacherSession.className ? (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400 text-xs font-black text-indigo-950 shadow-sm border border-amber-300">
+                  <School className="w-3.5 h-3.5 text-indigo-900" />
+                  <span>{teacherSession.grade} {teacherSession.className} 담임 모드</span>
+                </div>
+              ) : teacherSession?.role === 'MASTER' ? (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-300 text-xs font-black text-indigo-950 shadow-sm border border-amber-200">
+                  <Crown className="w-3.5 h-3.5 text-amber-700" />
+                  <span>총괄 관리자 모드 (전체 학급)</span>
+                </div>
+              ) : null}
               {onOpenPasswordChange && (
                 <button
                   onClick={onOpenPasswordChange}
@@ -576,7 +622,7 @@ export function TeacherDashboard({
                   title="교사 비밀번호 변경"
                 >
                   <KeyRound className="w-3 h-3 text-amber-300" />
-                  비밀번호 변경
+                  {teacherSession?.role === 'CLASS_TEACHER' ? '우리 반 비번 변경' : '비밀번호 변경'}
                 </button>
               )}
               {onLockTeacherMode && (

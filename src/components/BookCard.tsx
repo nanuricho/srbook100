@@ -56,7 +56,7 @@ export const BookCard: React.FC<BookCardProps> = ({
         {/* Book Title */}
         <h3
           onClick={() => onOpenDetail(book)}
-          className="text-base font-black text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-2 cursor-pointer mb-1.5 leading-snug"
+          className="text-base font-black text-indigo-950 group-hover:text-indigo-600 transition-colors line-clamp-2 cursor-pointer mb-1.5 leading-snug"
           title={`${book.title} (클릭하여 독서기록 작성)`}
         >
           {book.title}
@@ -99,7 +99,7 @@ export const BookCard: React.FC<BookCardProps> = ({
         <button
           type="button"
           onClick={() => onToggleComplete(book.num)}
-          className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl text-xs font-black transition-all cursor-pointer ${
+          className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
             isCompleted
               ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-xs'
               : isInProgress
@@ -130,7 +130,7 @@ export const BookCard: React.FC<BookCardProps> = ({
           type="button"
           onClick={() => onOpenDetail(book)}
           title="독서기록 및 평점 작성"
-          className="py-2.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-2 border-indigo-200 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+          className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 rounded-2xl text-xs font-bold transition-all cursor-pointer"
         >
           <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
           <span>독서기록</span>

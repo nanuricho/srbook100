@@ -23,6 +23,8 @@ import {
 import {
   isTeacherSessionAuthenticated,
   setTeacherSessionAuthenticated,
+  getCurrentTeacherSession,
+  TeacherSession,
 } from './utils/teacherAuth';
 import {
   DEFAULT_GAS_WEBAPP_URL,
@@ -56,6 +58,9 @@ export default function App() {
   // Teacher Authentication state
   const [isTeacherAuthenticated, setIsTeacherAuthenticated] = useState<boolean>(() =>
     isTeacherSessionAuthenticated()
+  );
+  const [teacherSession, setTeacherSession] = useState<TeacherSession | null>(() =>
+    getCurrentTeacherSession()
   );
   const [isTeacherAuthModalOpen, setIsTeacherAuthModalOpen] = useState<boolean>(false);
   const [teacherAuthTarget, setTeacherAuthTarget] = useState<'TEACHER_DASHBOARD' | 'SETTINGS' | 'PASSWORD_CHANGE'>(
@@ -468,14 +473,19 @@ export default function App() {
     setIsTeacherAuthModalOpen(true);
   };
 
-  const handleTeacherAuthSuccess = () => {
+  const handleTeacherAuthSuccess = (session?: TeacherSession) => {
+    const active = session || getCurrentTeacherSession();
+    setTeacherSession(active);
     setIsTeacherAuthenticated(true);
-    setTeacherSessionAuthenticated(true);
     setIsTeacherAuthModalOpen(false);
 
     if (teacherAuthTarget === 'TEACHER_DASHBOARD') {
       setActiveTab('TEACHER_DASHBOARD');
-      showToast('교사 인증 완료! 교사 대시보드로 이동했습니다. 👩‍🏫', 'success');
+      const label =
+        active?.role === 'CLASS_TEACHER'
+          ? `${active.grade} ${active.className} 담임선생님 인증 완료! 👩‍🏫`
+          : '총괄 관리자 인증 완료! 교사 대시보드로 이동했습니다. 👑';
+      showToast(label, 'success');
     } else if (teacherAuthTarget === 'SETTINGS') {
       setIsSettingsOpen(true);
       showToast('교사 인증 완료! 설정 창을 열었습니다. ⚙️', 'success');
@@ -487,6 +497,7 @@ export default function App() {
   const handleTeacherLogout = () => {
     setIsTeacherAuthenticated(false);
     setTeacherSessionAuthenticated(false);
+    setTeacherSession(null);
     if (activeTab === 'TEACHER_DASHBOARD') {
       setActiveTab('BOOKS');
     }
@@ -730,32 +741,45 @@ export default function App() {
               books={books}
               students={students}
               activeStudent={activeStudent}
-              onSelectStudent={handleSelectStudent}
+              onSelectStudent={(s) => {
+                handleSelectStudent(s);
+                if (s.grade) {
+                  setSelectedGrade(s.grade as any);
+                  setSearchQuery('');
+                  setSelectedStatus('ALL');
+                }
+              }}
+              onRegisterStudent={handleRegisterNewStudent}
               onOpenBookDetail={(b) => setSelectedBookForDetail(b)}
               onStudentLogout={handleLogoutStudent}
               selectedGradeFilter={selectedGrade}
-              onGradeFilterChange={(grade) => setSelectedGrade(grade as any)}
+              onGradeFilterChange={(grade) => {
+                setSelectedGrade(grade as any);
+                setSearchQuery('');
+                setSelectedStatus('ALL');
+              }}
             />
 
             {/* Reading Statistics Overview */}
             <StatsOverview books={books} records={records} />
 
-            {/* Filter Controls */}
-            <FilterControls
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              selectedGrade={selectedGrade}
-              onGradeChange={setSelectedGrade}
-              selectedStatus={selectedStatus}
-              onStatusChange={setSelectedStatus}
-              selectedSort={selectedSort}
-              onSortChange={setSelectedSort}
-              viewLayout={viewLayout}
-              onViewLayoutChange={setViewLayout}
-              filteredCount={filteredBooks.length}
-              totalCount={books.length}
-              onResetFilters={handleResetFilters}
-            />
+            {/* Book Section Anchor & Filter Controls */}
+            <div id="books-section" className="space-y-4 scroll-mt-6">
+              <FilterControls
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                selectedGrade={selectedGrade}
+                onGradeChange={setSelectedGrade}
+                selectedStatus={selectedStatus}
+                onStatusChange={setSelectedStatus}
+                selectedSort={selectedSort}
+                onSortChange={setSelectedSort}
+                viewLayout={viewLayout}
+                onViewLayoutChange={setViewLayout}
+                filteredCount={filteredBooks.length}
+                totalCount={books.length}
+                onResetFilters={handleResetFilters}
+              />
 
             {/* Book Grid / List Display */}
             {filteredBooks.length === 0 ? (
@@ -795,6 +819,7 @@ export default function App() {
                 ))}
               </div>
             )}
+            </div>
           </main>
         )}
 
@@ -827,6 +852,7 @@ export default function App() {
             currentStudentId={currentStudentId}
             onLockTeacherMode={handleTeacherLogout}
             onOpenPasswordChange={() => handleOpenTeacherAuth('PASSWORD_CHANGE')}
+            teacherSession={teacherSession}
           />
         )}
 

@@ -4,6 +4,9 @@ service cloud.firestore {
     match /students/{studentId} {
       allow read, write: if true;
     }
+    match /class_passwords/{classKey} {
+      allow read, write: if true;
+    }
     match /test/{testId} {
       allow read, write: if true;
     }
