@@ -211,140 +211,131 @@ export function QuickRecordHero({
           )}
         </div>
 
-        {/* 2-Column Layout: Left = Student Login & Grade Access, Right = Top 4 Books Ranking */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          {/* LEFT: Student Info & Direct Grade Access Form (7 cols) */}
-          <div className="lg:col-span-7 bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/15 flex flex-col justify-between space-y-4">
-            <div className="space-y-4">
-              {/* Header inside Student Box */}
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black text-amber-300 flex items-center gap-1.5">
-                  <User className="w-4 h-4 text-amber-300" />
-                  <span>학생 정보 입력 및 접속</span>
+        {/* Main Content: 1) Student Input on Top, 2) Top 4 Ranking Books Horizontally Directly Below */}
+        <div className="space-y-4">
+          {/* TOP: Student Info & Direct Grade Access Form */}
+          <div className="bg-white/10 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-white/15 space-y-3.5 shadow-xs">
+            {/* 1. Grade Selection Buttons (1학년 ~ 6학년) */}
+            <div>
+              <div className="text-xs text-indigo-200 font-bold mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded-full bg-amber-400 text-indigo-950 font-black text-[10px] inline-flex items-center justify-center">
+                    1
+                  </span>
+                  <span className="text-white font-black">학년을 선택하세요:</span>
+                </span>
+                <span className="text-amber-300 text-[11px] font-bold bg-indigo-950/70 px-2.5 py-0.5 rounded-full border border-indigo-700/50">
+                  {inputGrade} 권장도서 {gradeBooksCount}권
                 </span>
               </div>
-
-              {/* 1. Grade Selection Buttons (1학년 ~ 6학년) */}
-              <div>
-                <div className="text-xs text-indigo-200 font-bold mb-1.5 flex items-center justify-between">
-                  <span className="flex items-center gap-1">
-                    <span className="w-4 h-4 rounded-full bg-amber-400 text-indigo-950 font-black text-[10px] inline-flex items-center justify-center">
-                      1
-                    </span>
-                    <span>학년을 선택하세요:</span>
-                  </span>
-                  <span className="text-amber-300 text-[11px] font-bold">
-                    {inputGrade} 권장도서 {gradeBooksCount}권
-                  </span>
-                </div>
-                <div className="grid grid-cols-6 gap-2">
-                  {GRADES.map((g) => (
-                    <button
-                      key={g}
-                      type="button"
-                      onClick={() => handleGradeSelect(g)}
-                      className={`py-2 rounded-xl text-xs font-black transition-all cursor-pointer border text-center ${
-                        inputGrade === g
-                          ? 'bg-amber-400 text-indigo-950 border-amber-300 shadow-md scale-105 ring-2 ring-amber-300/40'
-                          : 'bg-indigo-950/80 text-indigo-200 border-indigo-700/60 hover:bg-indigo-900 hover:border-amber-400/50'
-                      }`}
-                    >
-                      {g}
-                    </button>
-                  ))}
-                </div>
+              <div className="grid grid-cols-6 gap-2">
+                {GRADES.map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => handleGradeSelect(g)}
+                    className={`py-2 rounded-xl text-xs font-black transition-all cursor-pointer border text-center ${
+                      inputGrade === g
+                        ? 'bg-amber-400 text-indigo-950 border-amber-300 shadow-md scale-102 ring-2 ring-amber-300/40'
+                        : 'bg-indigo-950/80 text-indigo-200 border-indigo-700/60 hover:bg-indigo-900 hover:border-amber-400/50'
+                    }`}
+                  >
+                    {g}
+                  </button>
+                ))}
               </div>
+            </div>
 
-              {/* 2. Class, Number, Name Inputs */}
-              <form onSubmit={handleApplyAndConnect} className="space-y-3">
-                <div className="text-xs text-indigo-200 font-bold flex items-center gap-1">
+            {/* 2. Class, Number, Name Inputs */}
+            <form onSubmit={handleApplyAndConnect} className="space-y-2.5">
+              <div className="text-xs text-indigo-200 font-bold flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
                   <span className="w-4 h-4 rounded-full bg-amber-400 text-indigo-950 font-black text-[10px] inline-flex items-center justify-center">
                     2
                   </span>
-                  <span>반, 번호, 이름을 입력하세요:</span>
+                  <span className="text-white font-black">반, 번호, 이름을 입력하세요:</span>
+                </span>
+                <span className="text-[11px] text-indigo-300 hidden sm:inline">
+                  이름 입력 후 [접속하기]를 누르면 내 서재가 열립니다.
+                </span>
+              </div>
+
+              <div className="grid grid-cols-12 gap-2.5 items-end">
+                <div className="col-span-3 sm:col-span-2">
+                  <label className="block text-[10px] font-bold text-indigo-300 mb-1">반</label>
+                  <input
+                    type="text"
+                    value={inputClass}
+                    onChange={(e) => setInputClass(e.target.value)}
+                    placeholder="1반"
+                    className="w-full px-3 py-2 bg-indigo-950/90 border border-indigo-500/60 rounded-xl text-xs font-bold text-white placeholder:text-indigo-400/50 focus:outline-hidden focus:border-amber-400 shadow-inner"
+                  />
                 </div>
 
-                <div className="grid grid-cols-12 gap-2.5 items-end">
-                  <div className="col-span-3 sm:col-span-2">
-                    <label className="block text-[10px] font-bold text-indigo-300 mb-1">반</label>
-                    <input
-                      type="text"
-                      value={inputClass}
-                      onChange={(e) => setInputClass(e.target.value)}
-                      placeholder="1반"
-                      className="w-full px-3 py-2 bg-indigo-950/90 border border-indigo-500/60 rounded-xl text-xs font-bold text-white placeholder:text-indigo-400/50 focus:outline-hidden focus:border-amber-400 shadow-inner"
-                    />
-                  </div>
-
-                  <div className="col-span-3 sm:col-span-2">
-                    <label className="block text-[10px] font-bold text-indigo-300 mb-1">번호</label>
-                    <input
-                      type="text"
-                      value={inputNumber}
-                      onChange={(e) => setInputNumber(e.target.value)}
-                      placeholder="1번"
-                      className="w-full px-3 py-2 bg-indigo-950/90 border border-indigo-500/60 rounded-xl text-xs font-bold text-white placeholder:text-indigo-400/50 focus:outline-hidden focus:border-amber-400 shadow-inner"
-                    />
-                  </div>
-
-                  <div className="col-span-6 sm:col-span-5">
-                    <label className="block text-[10px] font-bold text-indigo-300 mb-1">이름 (필수)</label>
-                    <input
-                      type="text"
-                      required
-                      value={inputName}
-                      onChange={(e) => setInputName(e.target.value)}
-                      placeholder="이름 입력"
-                      className="w-full px-3.5 py-2 bg-indigo-950/90 border-2 border-amber-400/70 focus:border-amber-300 rounded-xl text-xs font-black text-amber-300 placeholder:text-indigo-400/50 focus:outline-hidden shadow-inner"
-                    />
-                  </div>
-
-                  <div className="col-span-12 sm:col-span-3">
-                    <button
-                      type="submit"
-                      className="w-full py-2 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 hover:from-amber-300 hover:to-amber-200 active:from-amber-500 text-indigo-950 font-black text-xs rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <BookOpen className="w-3.5 h-3.5 text-indigo-950" />
-                      <span>접속하기</span>
-                      <ArrowRight className="w-3.5 h-3.5 text-indigo-950" />
-                    </button>
-                  </div>
+                <div className="col-span-3 sm:col-span-2">
+                  <label className="block text-[10px] font-bold text-indigo-300 mb-1">번호</label>
+                  <input
+                    type="text"
+                    value={inputNumber}
+                    onChange={(e) => setInputNumber(e.target.value)}
+                    placeholder="1번"
+                    className="w-full px-3 py-2 bg-indigo-950/90 border border-indigo-500/60 rounded-xl text-xs font-bold text-white placeholder:text-indigo-400/50 focus:outline-hidden focus:border-amber-400 shadow-inner"
+                  />
                 </div>
-              </form>
-            </div>
 
-            <div className="pt-2 border-t border-indigo-700/40 flex items-center justify-between text-[11px] text-indigo-200">
-              <span className="flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                접속 후 도서 카드에서 <strong className="text-white">완독 체크</strong>와 <strong className="text-amber-300">독서기록(별점·한줄평)</strong>을 바로 남길 수 있습니다.
-              </span>
-            </div>
+                <div className="col-span-6 sm:col-span-5">
+                  <label className="block text-[10px] font-bold text-indigo-300 mb-1">이름 (필수)</label>
+                  <input
+                    type="text"
+                    required
+                    value={inputName}
+                    onChange={(e) => setInputName(e.target.value)}
+                    placeholder="이름 입력"
+                    className="w-full px-3.5 py-2 bg-indigo-950/90 border-2 border-amber-400/70 focus:border-amber-300 rounded-xl text-xs font-black text-amber-300 placeholder:text-indigo-400/50 focus:outline-hidden shadow-inner"
+                  />
+                </div>
+
+                <div className="col-span-12 sm:col-span-3">
+                  <button
+                    type="submit"
+                    className="w-full py-2 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 hover:from-amber-300 hover:to-amber-200 active:from-amber-500 text-indigo-950 font-black text-xs rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <BookOpen className="w-3.5 h-3.5 text-indigo-950" />
+                    <span>접속하기</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-indigo-950" />
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
 
-          {/* RIGHT: Top Rated Books Ranking Board (5 cols) */}
-          <div className="lg:col-span-5 bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/15 flex flex-col justify-between space-y-3.5">
-            <div className="flex items-center justify-between">
+          {/* BOTTOM: Top Rated Books Ranking Board (Horizontal 4-Column Layout) */}
+          <div className="bg-white/10 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-white/15 space-y-3.5 shadow-xs">
+            {/* Ranking Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-amber-400/20 rounded-lg text-amber-300 border border-amber-400/30">
+                <div className="p-1.5 bg-amber-400/20 rounded-xl text-amber-300 border border-amber-400/30">
                   <TrendingUp className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-xs font-black text-amber-300">
-                    🏆 서룡초 최고 평점 도서 TOP 4
-                  </span>
-                  <span className="text-[10px] text-indigo-200 block">
-                    [{inputGrade}] 학생 추천 인기 도서
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs sm:text-sm font-black text-amber-300">
+                      🏆 서룡초 최고 평점 도서 TOP 4
+                    </span>
+                    <span className="text-[10px] font-bold text-amber-300 bg-indigo-950/80 px-2 py-0.5 rounded-full border border-indigo-700/60 inline-flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      실시간
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-indigo-200 block">
+                    <strong>[{inputGrade}]</strong> 친구들이 가장 높은 별점을 준 추천 인기 도서 (클릭 시 별점 및 한줄평 확인)
                   </span>
                 </div>
               </div>
-
-              <span className="text-[10px] font-bold text-amber-300 bg-indigo-950/80 px-2 py-0.5 rounded-lg border border-indigo-700/60">
-                실시간
-              </span>
             </div>
 
-            {/* Ranking Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2.5">
+            {/* Horizontal 4 Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {topBooks.length > 0 ? (
                 topBooks.map((item, index) => {
                   const isTop1 = index === 0;
@@ -355,22 +346,22 @@ export function QuickRecordHero({
                     <div
                       key={item.num}
                       onClick={() => setSelectedReviewStat(item)}
-                      className={`group relative p-3 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+                      className={`group relative p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between hover:-translate-y-1 hover:shadow-lg ${
                         isTop1
-                          ? 'bg-gradient-to-br from-amber-500/25 to-indigo-950/90 border-amber-400/60 hover:border-amber-300 shadow-md hover:-translate-y-0.5'
+                          ? 'bg-gradient-to-br from-amber-500/25 via-indigo-950/90 to-indigo-950/95 border-amber-400/60 hover:border-amber-300 hover:shadow-amber-500/20'
                           : isTop2
-                          ? 'bg-gradient-to-br from-slate-300/20 to-indigo-950/90 border-slate-300/40 hover:border-slate-200 hover:-translate-y-0.5'
+                          ? 'bg-gradient-to-br from-slate-300/20 via-indigo-950/90 to-indigo-950/95 border-slate-300/40 hover:border-slate-200'
                           : isTop3
-                          ? 'bg-gradient-to-br from-amber-700/25 to-indigo-950/90 border-amber-600/40 hover:border-amber-500 hover:-translate-y-0.5'
-                          : 'bg-indigo-950/70 border-indigo-800/60 hover:border-indigo-500 hover:bg-indigo-900/60'
+                          ? 'bg-gradient-to-br from-amber-700/25 via-indigo-950/90 to-indigo-950/95 border-amber-600/40 hover:border-amber-500'
+                          : 'bg-indigo-950/80 border-indigo-800/60 hover:border-indigo-500 hover:bg-indigo-900/70'
                       }`}
                     >
                       <div>
                         {/* Rank Badge & Grade */}
-                        <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-1.5">
                             <span
-                              className={`w-5 h-5 rounded-lg text-[11px] font-black flex items-center justify-center shadow-xs ${
+                              className={`px-2 py-0.5 rounded-lg text-[10px] font-black flex items-center gap-1 shadow-2xs ${
                                 isTop1
                                   ? 'bg-amber-400 text-indigo-950'
                                   : isTop2
@@ -380,7 +371,7 @@ export function QuickRecordHero({
                                   : 'bg-indigo-900 text-indigo-200 border border-indigo-700'
                               }`}
                             >
-                              {index + 1}
+                              <span>{index + 1}위</span>
                             </span>
                             <span className="text-[10px] font-bold text-slate-300">
                               No.{item.num}
@@ -393,16 +384,19 @@ export function QuickRecordHero({
                         </div>
 
                         {/* Title & Author */}
-                        <h4 className="font-extrabold text-xs text-white group-hover:text-amber-300 transition-colors line-clamp-1 mb-0.5">
+                        <h4
+                          className="font-black text-xs sm:text-sm text-white group-hover:text-amber-300 transition-colors line-clamp-1 mb-1"
+                          title={item.book.title}
+                        >
                           {item.book.title}
                         </h4>
-                        <p className="text-[10px] text-indigo-300 truncate">
+                        <p className="text-[11px] text-indigo-300 truncate">
                           {item.book.author}
                         </p>
                       </div>
 
                       {/* Rating & Action Row */}
-                      <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center justify-between gap-1">
+                      <div className="mt-3 pt-2 border-t border-white/10 flex items-center justify-between gap-1">
                         <div className="flex items-center gap-1">
                           <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                           <span className="text-xs font-black text-amber-300">
@@ -415,24 +409,26 @@ export function QuickRecordHero({
 
                         <span className="text-[10px] font-bold text-amber-300/90 group-hover:text-amber-200 flex items-center gap-1">
                           <MessageSquare className="w-3 h-3" />
-                          <span>평점·한줄평 보기</span>
+                          <span>한줄평 보기</span>
                         </span>
                       </div>
                     </div>
                   );
                 })
               ) : (
-                <div className="py-6 text-center text-indigo-300 text-xs">
+                <div className="col-span-full py-6 text-center text-indigo-200 text-xs bg-indigo-950/50 rounded-xl border border-indigo-800/40">
                   등록된 평점 정보가 없습니다. 도서명을 클릭하여 첫 평점을 남겨보세요!
                 </div>
               )}
             </div>
 
-            {/* Bottom Info */}
-            <div className="bg-indigo-950/60 px-3.5 py-2 rounded-xl border border-indigo-800/40 flex items-center justify-between text-[11px] text-indigo-200">
+            {/* Bottom Tip Bar */}
+            <div className="pt-2 border-t border-indigo-700/40 flex items-center justify-between text-[11px] text-indigo-200">
               <span className="flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                도서명을 클릭하면 해당 도서의 평점과 친구들의 한줄평을 확인할 수 있습니다.
+                <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                <span>
+                  도서 카드를 클릭하면 친구들이 남긴 별점과 한줄평을 볼 수 있습니다. 접속 후 아래 도서 목록에서 완독 체크와 독서기록을 남겨보세요!
+                </span>
               </span>
             </div>
           </div>
