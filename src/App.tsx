@@ -761,7 +761,18 @@ export default function App() {
             />
 
             {/* Reading Statistics Overview */}
-            <StatsOverview books={books} records={records} />
+            <StatsOverview
+              books={books}
+              records={records}
+              activeStudent={activeStudent}
+              students={students}
+              selectedGrade={selectedGrade}
+              onSelectGrade={(grade) => {
+                setSelectedGrade(grade as any);
+                setSearchQuery('');
+                setSelectedStatus('ALL');
+              }}
+            />
 
             {/* Book Section Anchor & Filter Controls */}
             <div id="books-section" className="space-y-4 scroll-mt-6">

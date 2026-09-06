@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Book, ReadingRecord, Student, GradeFilter } from '../types';
-import { getCurrentBadge, getNextBadge, BADGES } from '../utils/badges';
-import { CheckCircle2, BookOpen, Clock, Trophy, Target, Sparkles, ChevronRight, Award } from 'lucide-react';
+import { SAMPLE_STUDENTS } from '../utils/studentStorage';
+import { CheckCircle2, BookOpen, Clock, Trophy, Target, Sparkles, BarChart3, Users } from 'lucide-react';
 
 interface StatsOverviewProps {
   books: Book[];
   records: Record<string, ReadingRecord>;
   activeStudent?: Student | null;
+  students?: Student[];
   selectedGrade?: GradeFilter;
   onSelectGrade?: (grade: GradeFilter) => void;
 }
@@ -15,6 +16,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
   books,
   records,
   activeStudent,
+  students,
   selectedGrade,
   onSelectGrade,
 }) => {
@@ -56,6 +58,16 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
     }
   }, [activeStudent?.grade, selectedGrade]);
 
+  // Effective students list to calculate authentic grade averages
+  const effectiveStudents = useMemo(() => {
+    if (students && students.length > 0) {
+      const presentGrades = new Set(students.map((s) => s.grade));
+      const missingSamples = SAMPLE_STUDENTS.filter((s) => !presentGrades.has(s.grade));
+      return [...students, ...missingSamples];
+    }
+    return SAMPLE_STUDENTS;
+  }, [students]);
+
   // Target Grade Specific Stats
   const targetGradeBooks = useMemo(() => {
     return books.filter((b) => b.grade.includes(targetGrade));
@@ -73,6 +85,57 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
   const targetPercentage = targetTotal > 0 ? Math.round((targetCompleted / targetTotal) * 100) : 0;
   const targetRemaining = Math.max(0, targetTotal - targetCompleted);
 
+  // Overall Grade breakdown computation with average attainment per grade
+  const grades = ['1학년', '2학년', '3학년', '4학년', '5학년', '6학년', '전학년'];
+  const gradeStats = useMemo(() => {
+    return grades.map((grade) => {
+      const gradeBooks = books.filter(
+        (b) => b.grade.includes(grade) || (grade === '전학년' && (b.grade === '전학년' || b.grade === '공통'))
+      );
+      const gTotal = gradeBooks.length;
+
+      const gradeStudents = grade === '전학년'
+        ? effectiveStudents
+        : effectiveStudents.filter((s) => s.grade === grade);
+      const studentCount = gradeStudents.length;
+
+      // Calculate total books completed by students in this grade
+      const totalCompletedByStudents = gradeStudents.reduce((acc, s) => {
+        const c = gradeBooks.filter((b) => s.records?.[b.num]?.status === 'COMPLETED').length;
+        return acc + c;
+      }, 0);
+
+      const avgCompleted = studentCount > 0 ? Number((totalCompletedByStudents / studentCount).toFixed(1)) : 0;
+      const avgPercent = gTotal > 0 ? Math.round((avgCompleted / gTotal) * 100) : 0;
+
+      // Active student's personal completed count for this grade
+      const myCompleted = gradeBooks.filter((b) => records[b.num]?.status === 'COMPLETED').length;
+      const myPercent = gTotal > 0 ? Math.round((myCompleted / gTotal) * 100) : 0;
+
+      return {
+        grade,
+        total: gTotal,
+        studentCount,
+        avgCompleted,
+        avgPercent,
+        myCompleted,
+        myPercent,
+      };
+    }).filter((g) => g.total > 0);
+  }, [books, effectiveStudents, records]);
+
+  const currentTargetStats = useMemo(() => {
+    return gradeStats.find((g) => g.grade === targetGrade) || {
+      grade: targetGrade,
+      total: targetTotal,
+      studentCount: 0,
+      avgCompleted: 0,
+      avgPercent: 0,
+      myCompleted: targetCompleted,
+      myPercent: targetPercentage,
+    };
+  }, [gradeStats, targetGrade, targetTotal, targetCompleted, targetPercentage]);
+
   // Grade Milestone Badge & Description based on grade progress
   const gradeMilestone = useMemo(() => {
     if (targetTotal === 0) {
@@ -83,67 +146,59 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
       };
     }
 
-    if (targetCompleted >= targetTotal) {
+    if (activeStudent) {
+      if (targetCompleted >= targetTotal) {
+        return {
+          icon: '👑',
+          title: `${targetGrade} 필독도서 완독 달성!`,
+          description: `축하합니다! ${targetGrade} 필독도서 ${targetTotal}권을 모두 완독하여 학년 마스터가 되었어요! 🎉`,
+        };
+      }
+
+      if (targetCompleted === 0) {
+        return {
+          icon: '🌱',
+          title: `${targetGrade} 독서 씨앗`,
+          description: `${targetGrade} 필독도서 총 ${targetTotal}권 완독 목표에 도전해보세요! (학년 평균: ${currentTargetStats.avgCompleted}권)`,
+        };
+      }
+
+      const pct = (targetCompleted / targetTotal) * 100;
+      if (pct < 30) {
+        return {
+          icon: '🌿',
+          title: `${targetGrade} 독서 새싹`,
+          description: `${targetTotal}권의 필독도서 중 ${targetCompleted}권을 완독하고 씨앗을 틔웠어요. (학년 평균: ${currentTargetStats.avgCompleted}권)`,
+        };
+      }
+      if (pct < 60) {
+        return {
+          icon: '📖',
+          title: `${targetGrade} 독서 탐험가`,
+          description: `${targetTotal}권 중 ${targetCompleted}권을 완독하며 책 읽는 재미를 알아가고 있어요.`,
+        };
+      }
+      if (pct < 90) {
+        return {
+          icon: '🌳',
+          title: `${targetGrade} 독서 마라토너`,
+          description: `${targetTotal}권 중 ${targetCompleted}권 완독! 절반을 넘어 풍성한 지식의 나무가 자라납니다.`,
+        };
+      }
       return {
-        icon: '👑',
-        title: `${targetGrade} 필독도서 완독 달성!`,
-        description: `축하합니다! ${targetGrade} 필독도서 ${targetTotal}권을 모두 완독하여 학년 마스터가 되었어요! 🎉`,
+        icon: '💫',
+        title: `${targetGrade} 완독 눈앞!`,
+        description: `완독까지 단 ${targetRemaining}권 남았어요! 끝까지 멋지게 완주해보세요!`,
       };
     }
 
-    if (targetCompleted === 0) {
-      return {
-        icon: '🌱',
-        title: `${targetGrade} 독서 씨앗`,
-        description: `${targetGrade} 필독도서 총 ${targetTotal}권 완독 목표에 도전해보세요!`,
-      };
-    }
-
-    const pct = (targetCompleted / targetTotal) * 100;
-    if (pct < 30) {
-      return {
-        icon: '🌿',
-        title: `${targetGrade} 독서 새싹`,
-        description: `${targetTotal}권의 필독도서 중 ${targetCompleted}권을 완독하고 씨앗을 틔웠어요.`,
-      };
-    }
-    if (pct < 60) {
-      return {
-        icon: '📖',
-        title: `${targetGrade} 독서 탐험가`,
-        description: `${targetTotal}권 중 ${targetCompleted}권을 완독하며 책 읽는 재미를 알아가고 있어요.`,
-      };
-    }
-    if (pct < 90) {
-      return {
-        icon: '🌳',
-        title: `${targetGrade} 독서 마라토너`,
-        description: `${targetTotal}권 중 ${targetCompleted}권 완독! 절반을 넘어 풍성한 지식의 나무가 자라납니다.`,
-      };
-    }
+    // When viewing generally / no active student logged in
     return {
-      icon: '💫',
-      title: `${targetGrade} 완독 눈앞!`,
-      description: `완독까지 단 ${targetRemaining}권 남았어요! 끝까지 멋지게 완주해보세요!`,
+      icon: '📊',
+      title: `${targetGrade} 평균 도달 현황`,
+      description: `${targetGrade} 학생 ${currentTargetStats.studentCount}명의 평균 완독 권수는 ${currentTargetStats.avgCompleted}권 (${currentTargetStats.avgPercent}%) 입니다.`,
     };
-  }, [targetCompleted, targetTotal, targetGrade, targetRemaining]);
-
-  // Overall Grade breakdown computation
-  const grades = ['1학년', '2학년', '3학년', '4학년', '5학년', '6학년', '전학년'];
-  const gradeStats = grades.map((grade) => {
-    const gradeBooks = books.filter((b) => b.grade.includes(grade) || (grade === '전학년' && (b.grade === '전학년' || b.grade === '공통')));
-    const gTotal = gradeBooks.length;
-    const gCompleted = gradeBooks.filter(
-      (b) => records[b.num]?.status === 'COMPLETED'
-    ).length;
-    const gPercent = gTotal > 0 ? Math.round((gCompleted / gTotal) * 100) : 0;
-    return {
-      grade,
-      total: gTotal,
-      completed: gCompleted,
-      percent: gPercent,
-    };
-  }).filter((g) => g.total > 0);
+  }, [targetCompleted, targetTotal, targetGrade, targetRemaining, activeStudent, currentTargetStats]);
 
   const handleSwitchTargetGrade = (g: string) => {
     setTargetGrade(g);
@@ -222,7 +277,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
 
       {/* Next Badge Goal + Grade Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 pt-4 border-t border-slate-100">
-        {/* Grade-Specific Achievement Goal Card (Matches User Image Request) */}
+        {/* Grade-Specific Achievement Goal Card */}
         <div className="lg:col-span-1 bg-gradient-to-br from-indigo-950 via-indigo-900 to-slate-900 rounded-2xl p-4 md:p-5 text-white flex flex-col justify-between relative overflow-hidden shadow-md border border-indigo-800/60">
           <div className="absolute top-0 right-0 p-10 bg-indigo-500/10 rounded-full blur-xl pointer-events-none" />
 
@@ -239,8 +294,17 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
                 </span>
               </div>
               <div className="flex items-center gap-1 text-right">
-                <span className="font-black text-amber-300 text-sm">{targetCompleted} / {targetTotal}권</span>
-                <span className="text-[11px] text-indigo-200 font-bold">({targetPercentage}%)</span>
+                {activeStudent ? (
+                  <>
+                    <span className="font-black text-amber-300 text-sm">{targetCompleted} / {targetTotal}권</span>
+                    <span className="text-[11px] text-indigo-200 font-bold">({targetPercentage}%)</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="font-black text-amber-300 text-sm">평균 {currentTargetStats.avgCompleted} / {targetTotal}권</span>
+                    <span className="text-[11px] text-indigo-200 font-bold">({currentTargetStats.avgPercent}%)</span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -282,45 +346,62 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
             </div>
           </div>
 
-          {/* Progress Bar & Remaining Count (Matches User Image Request) */}
+          {/* Progress Bar & Remaining Count */}
           <div className="mt-3.5 pt-2 border-t border-indigo-800/40">
             <div className="w-full h-2.5 bg-slate-800/90 rounded-full overflow-hidden p-0.5 border border-indigo-700/50">
               <div
                 className="h-full bg-gradient-to-r from-amber-400 via-emerald-400 to-teal-300 rounded-full transition-all duration-500 shadow-xs"
-                style={{ width: `${targetPercentage}%` }}
+                style={{ width: `${activeStudent ? targetPercentage : currentTargetStats.avgPercent}%` }}
               />
             </div>
             <div className="flex items-center justify-between text-[11px] mt-1.5 text-slate-400">
               <span>
-                {targetInProgress > 0 ? (
-                  <span className="text-amber-200 font-medium">읽는 중 {targetInProgress}권</span>
+                {activeStudent ? (
+                  targetInProgress > 0 ? (
+                    <span className="text-amber-200 font-medium">읽는 중 {targetInProgress}권</span>
+                  ) : (
+                    <span>진행률 {targetPercentage}%</span>
+                  )
                 ) : (
-                  <span>진행률 {targetPercentage}%</span>
+                  <span className="text-indigo-200 font-medium">학년 평균 {currentTargetStats.avgPercent}% 도달</span>
                 )}
               </span>
               <span className="text-right">
-                {targetRemaining > 0 ? (
-                  <>
-                    완독까지 <span className="text-amber-300 font-black text-xs">{targetRemaining}권</span> 남음
-                  </>
+                {activeStudent ? (
+                  targetRemaining > 0 ? (
+                    <>
+                      완독까지 <span className="text-amber-300 font-black text-xs">{targetRemaining}권</span> 남음
+                    </>
+                  ) : (
+                    <span className="text-emerald-300 font-bold">🎉 {targetGrade} 목표 완독 완료!</span>
+                  )
                 ) : (
-                  <span className="text-emerald-300 font-bold">🎉 {targetGrade} 목표 완독 완료!</span>
+                  <span className="text-slate-300">
+                    학년 평균 완독까지 <span className="text-amber-300 font-black">{Math.max(0, targetTotal - Math.round(currentTargetStats.avgCompleted))}권</span>
+                  </span>
                 )}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Grade Breakdown Progress Meters */}
+        {/* Grade Breakdown Progress Meters: Shows Average Attainment per Grade */}
         <div className="lg:col-span-2 flex flex-col justify-center">
-          <div className="flex items-center justify-between mb-2.5">
-            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              학년별 완독 현황
-            </h4>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2.5">
+            <div className="flex items-center gap-2">
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <BarChart3 className="w-3.5 h-3.5 text-indigo-600" />
+                <span>학년별 평균 도달 정도</span>
+              </h4>
+              <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-full">
+                학생 평균치 기준
+              </span>
+            </div>
             <span className="text-[11px] text-slate-400">
               카드를 클릭하면 해당 학년 목표로 전환됩니다
             </span>
           </div>
+
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
             {gradeStats.map((item) => {
               const isSelected = targetGrade === item.grade;
@@ -330,39 +411,58 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
                   key={item.grade}
                   type="button"
                   onClick={() => handleSwitchTargetGrade(item.grade)}
-                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
                     isSelected
                       ? 'bg-indigo-50 border-indigo-400 shadow-xs ring-2 ring-indigo-300/40'
                       : 'bg-slate-50 border-slate-100 hover:bg-slate-100/80 hover:border-slate-300'
                   }`}
                 >
-                  <div className="flex justify-between items-center text-xs mb-1.5">
-                    <span className="font-bold text-slate-800 flex items-center gap-1">
-                      <span>{item.grade}</span>
-                      {isMyGrade && (
-                        <span className="text-[9px] px-1 py-0.2 bg-amber-100 text-amber-800 rounded font-black">
-                          내 학년
+                  <div>
+                    <div className="flex justify-between items-center text-xs mb-1.5">
+                      <span className="font-bold text-slate-800 flex items-center gap-1">
+                        <span>{item.grade}</span>
+                        {isMyGrade && (
+                          <span className="text-[9px] px-1 py-0.2 bg-amber-100 text-amber-800 rounded font-black">
+                            내 학년
+                          </span>
+                        )}
+                      </span>
+                      <span className={`font-black text-xs ${isSelected ? 'text-indigo-700' : 'text-slate-700'}`}>
+                        평균 {item.avgCompleted} / {item.total}권
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-200/80 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${
+                          item.avgPercent >= 70
+                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
+                            : item.avgPercent >= 40
+                            ? 'bg-gradient-to-r from-indigo-500 to-teal-400'
+                            : 'bg-gradient-to-r from-indigo-400 to-indigo-600'
+                        }`}
+                        style={{ width: `${Math.min(100, item.avgPercent)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-2 pt-1 border-t border-slate-200/60 flex flex-col gap-0.5">
+                    <div className="flex justify-between items-center text-[10px] text-slate-500 font-medium">
+                      <span className="flex items-center gap-0.5 text-slate-400">
+                        <Users className="w-2.5 h-2.5" />
+                        <span>{item.studentCount}명 기준</span>
+                      </span>
+                      <span className="font-black text-indigo-600">
+                        평균 {item.avgPercent}% 도달
+                      </span>
+                    </div>
+                    {activeStudent && (
+                      <div className="flex justify-between items-center text-[9px] text-slate-400 pt-0.5">
+                        <span>내 완독</span>
+                        <span className={item.myCompleted >= item.avgCompleted ? 'font-bold text-emerald-600' : 'font-medium text-slate-500'}>
+                          {item.myCompleted}권 ({item.myPercent}%)
                         </span>
-                      )}
-                    </span>
-                    <span className={`font-black text-xs ${isSelected ? 'text-indigo-700' : 'text-slate-600'}`}>
-                      {item.completed}/{item.total}
-                    </span>
-                  </div>
-                  <div className="w-full h-2 bg-slate-200/80 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-300 ${
-                        item.percent >= 100
-                          ? 'bg-emerald-500'
-                          : isSelected
-                          ? 'bg-indigo-600'
-                          : 'bg-indigo-400'
-                      }`}
-                      style={{ width: `${item.percent}%` }}
-                    />
-                  </div>
-                  <div className="text-[10px] text-slate-400 text-right mt-1 font-medium">
-                    {item.percent}% 달성
+                      </div>
+                    )}
                   </div>
                 </button>
               );
