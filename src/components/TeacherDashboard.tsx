@@ -9,7 +9,6 @@ import {
   getCompletedCount,
   getInProgressCount,
   getStudentProgressPercent,
-  SAMPLE_STUDENTS,
 } from '../utils/studentStorage';
 import { getCurrentBadge, BADGES } from '../utils/badges';
 import {
@@ -308,12 +307,10 @@ export function TeacherDashboard({
     }, 1200);
   };
 
-  // Load Sample Preset Roster
+  // Load Sample Preset Roster Format
   const handleLoadSampleRoster = () => {
-    const sampleText = SAMPLE_STUDENTS.map(
-      (s) => `${s.grade} ${s.className} ${s.studentNumber || '1번'} ${s.name}`
-    ).join('\n');
-    setBatchText(sampleText);
+    const sampleFormatText = `3학년 1반 1번 김민준\n3학년 1반 2번 이서아\n3학년 1반 3번 박도윤`;
+    setBatchText(sampleFormatText);
   };
 
   // Single Student Add
@@ -449,15 +446,6 @@ export function TeacherDashboard({
 
     onUpdateStudents(updated);
     setDeleteConfirmation(null);
-  };
-
-  // Restore Default Sample Students
-  const handleRestoreSampleStudents = () => {
-    if (confirm('기본 예시 학생 6명의 데이터로 복원하시겠습니까?')) {
-      onUpdateStudents(SAMPLE_STUDENTS);
-      setSelectedStudentIds([]);
-      setInspectedStudent(null);
-    }
   };
 
   // Export CSV Report - Student Roster
@@ -1616,14 +1604,7 @@ export function TeacherDashboard({
           {/* Roster Management & Danger Zone */}
           <div className="mt-8 pt-5 border-t border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-              <span>명단 관리 액션:</span>
-              <button
-                type="button"
-                onClick={handleRestoreSampleStudents}
-                className="text-slate-600 hover:text-indigo-600 font-bold underline cursor-pointer"
-              >
-                예시 명단으로 복원
-              </button>
+              <span>등록 학생: <strong className="text-slate-800">{students.length}명</strong></span>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">

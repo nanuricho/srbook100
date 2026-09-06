@@ -19,6 +19,7 @@ import {
   saveStudentsToStorage,
   getCompletedCount,
   STORAGE_KEY_CURRENT_STUDENT_ID,
+  ALL_SAMPLE_STUDENT_IDS,
 } from './utils/studentStorage';
 import {
   isTeacherSessionAuthenticated,
@@ -135,13 +136,25 @@ export default function App() {
     const unsubscribe = subscribeToStudentsFromCloud(
       (cloudStudents) => {
         setCloudStatus('synced');
-        if (cloudStudents.length > 0) {
-          setStudents(cloudStudents);
-          saveStudentsToStorage(cloudStudents);
-        } else if (initialCloudMountRef.current) {
-          // If Firestore is completely empty and local storage has user-entered students, sync them to cloud
+        // Filter out any legacy sample student IDs so only user-entered students exist
+        const cleanCloud = cloudStudents.filter((s) => !ALL_SAMPLE_STUDENT_IDS.has(s.id));
+        const hadSampleDataInCloud = cleanCloud.length !== cloudStudents.length;
+
+        // Clean up legacy sample IDs from Firestore in the background if found
+        if (hadSampleDataInCloud) {
+          const sampleDocsToDelete = cloudStudents.filter((s) => ALL_SAMPLE_STUDENT_IDS.has(s.id));
+          sampleDocsToDelete.forEach((s) => {
+            deleteStudentFromCloud(s.id).catch(() => {});
+          });
+        }
+
+        if (cleanCloud.length > 0) {
+          setStudents(cleanCloud);
+          saveStudentsToStorage(cleanCloud);
+        } else {
           const local = loadStudentsFromStorage();
-          if (local.length > 0) {
+          setStudents(local);
+          if (local.length > 0 && initialCloudMountRef.current) {
             saveMultipleStudentsToCloud(local).catch((e) => console.warn('Cloud migration note:', e));
           }
         }

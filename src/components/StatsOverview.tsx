@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Book, ReadingRecord, Student, GradeFilter } from '../types';
-import { SAMPLE_STUDENTS } from '../utils/studentStorage';
 import { CheckCircle2, BookOpen, Clock, Trophy, Target, Sparkles, BarChart3, Users } from 'lucide-react';
 
 interface StatsOverviewProps {
@@ -35,7 +34,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
   // Grade list
   const GRADES = ['1학년', '2학년', '3학년', '4학년', '5학년', '6학년'];
 
-  // Determine effective grade from active student (highest priority), then selected grade filter, default to '1학년'
+  // Determine effective grade from active student (highest priority), then selected grade filter, then grade with students, default to '1학년'
   const initialGrade = useMemo(() => {
     if (activeStudent?.grade && GRADES.includes(activeStudent.grade)) {
       return activeStudent.grade;
@@ -43,8 +42,12 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
     if (selectedGrade && GRADES.includes(selectedGrade)) {
       return selectedGrade;
     }
+    if (students && students.length > 0) {
+      const studentGrade = students.find((s) => GRADES.includes(s.grade))?.grade;
+      if (studentGrade) return studentGrade;
+    }
     return '1학년';
-  }, [activeStudent?.grade, selectedGrade]);
+  }, [activeStudent?.grade, selectedGrade, students]);
 
   // Current grade target displayed in the goal card
   const [targetGrade, setTargetGrade] = useState<string>(initialGrade);
@@ -58,14 +61,9 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
     }
   }, [activeStudent?.grade, selectedGrade]);
 
-  // Effective students list to calculate authentic grade averages
+  // Effective students list strictly from entered data
   const effectiveStudents = useMemo(() => {
-    if (students && students.length > 0) {
-      const presentGrades = new Set(students.map((s) => s.grade));
-      const missingSamples = SAMPLE_STUDENTS.filter((s) => !presentGrades.has(s.grade));
-      return [...students, ...missingSamples];
-    }
-    return SAMPLE_STUDENTS;
+    return students || [];
   }, [students]);
 
   // Target Grade Specific Stats
@@ -156,19 +154,25 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
       }
 
       if (targetCompleted === 0) {
+        const avgText = currentTargetStats.studentCount > 0
+          ? ` (학년 평균: ${currentTargetStats.avgCompleted}권)`
+          : '';
         return {
           icon: '🌱',
           title: `${targetGrade} 독서 씨앗`,
-          description: `${targetGrade} 필독도서 총 ${targetTotal}권 완독 목표에 도전해보세요! (학년 평균: ${currentTargetStats.avgCompleted}권)`,
+          description: `${targetGrade} 필독도서 총 ${targetTotal}권 완독 목표에 도전해보세요!${avgText}`,
         };
       }
 
       const pct = (targetCompleted / targetTotal) * 100;
       if (pct < 30) {
+        const avgText = currentTargetStats.studentCount > 0
+          ? ` (학년 평균: ${currentTargetStats.avgCompleted}권)`
+          : '';
         return {
           icon: '🌿',
           title: `${targetGrade} 독서 새싹`,
-          description: `${targetTotal}권의 필독도서 중 ${targetCompleted}권을 완독하고 씨앗을 틔웠어요. (학년 평균: ${currentTargetStats.avgCompleted}권)`,
+          description: `${targetTotal}권의 필독도서 중 ${targetCompleted}권을 완독하고 씨앗을 틔웠어요.${avgText}`,
         };
       }
       if (pct < 60) {
@@ -193,10 +197,18 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
     }
 
     // When viewing generally / no active student logged in
+    if (currentTargetStats.studentCount === 0) {
+      return {
+        icon: '📚',
+        title: `${targetGrade} 필독도서 ${targetTotal}권`,
+        description: `${targetGrade}에 등록된 학생이 없습니다. 학생 명단이 등록되고 독서 활동이 기록되면 실제 입력 데이터로 평균 통계가 집계됩니다.`,
+      };
+    }
+
     return {
       icon: '📊',
       title: `${targetGrade} 평균 도달 현황`,
-      description: `${targetGrade} 학생 ${currentTargetStats.studentCount}명의 평균 완독 권수는 ${currentTargetStats.avgCompleted}권 (${currentTargetStats.avgPercent}%) 입니다.`,
+      description: `${targetGrade} 등록 학생 ${currentTargetStats.studentCount}명의 평균 완독 권수는 ${currentTargetStats.avgCompleted}권 (${currentTargetStats.avgPercent}%) 입니다.`,
     };
   }, [targetCompleted, targetTotal, targetGrade, targetRemaining, activeStudent, currentTargetStats]);
 
@@ -301,7 +313,9 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
                   </>
                 ) : (
                   <>
-                    <span className="font-black text-amber-300 text-sm">평균 {currentTargetStats.avgCompleted} / {targetTotal}권</span>
+                    <span className="font-black text-amber-300 text-sm">
+                      {currentTargetStats.studentCount > 0 ? `평균 ${currentTargetStats.avgCompleted} / ${targetTotal}권` : `0 / ${targetTotal}권`}
+                    </span>
                     <span className="text-[11px] text-indigo-200 font-bold">({currentTargetStats.avgPercent}%)</span>
                   </>
                 )}
@@ -362,8 +376,10 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
                   ) : (
                     <span>진행률 {targetPercentage}%</span>
                   )
-                ) : (
+                ) : currentTargetStats.studentCount > 0 ? (
                   <span className="text-indigo-200 font-medium">학년 평균 {currentTargetStats.avgPercent}% 도달</span>
+                ) : (
+                  <span className="text-slate-400 font-medium">등록 학생 없음</span>
                 )}
               </span>
               <span className="text-right">
@@ -375,10 +391,12 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
                   ) : (
                     <span className="text-emerald-300 font-bold">🎉 {targetGrade} 목표 완독 완료!</span>
                   )
-                ) : (
+                ) : currentTargetStats.studentCount > 0 ? (
                   <span className="text-slate-300">
                     학년 평균 완독까지 <span className="text-amber-300 font-black">{Math.max(0, targetTotal - Math.round(currentTargetStats.avgCompleted))}권</span>
                   </span>
+                ) : (
+                  <span className="text-slate-400">기록 없음</span>
                 )}
               </span>
             </div>
@@ -428,7 +446,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
                         )}
                       </span>
                       <span className={`font-black text-xs ${isSelected ? 'text-indigo-700' : 'text-slate-700'}`}>
-                        평균 {item.avgCompleted} / {item.total}권
+                        {item.studentCount > 0 ? `평균 ${item.avgCompleted} / ${item.total}권` : `0 / ${item.total}권`}
                       </span>
                     </div>
                     <div className="w-full h-2 bg-slate-200/80 rounded-full overflow-hidden">
@@ -449,16 +467,16 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
                     <div className="flex justify-between items-center text-[10px] text-slate-500 font-medium">
                       <span className="flex items-center gap-0.5 text-slate-400">
                         <Users className="w-2.5 h-2.5" />
-                        <span>{item.studentCount}명 기준</span>
+                        <span>{item.studentCount > 0 ? `${item.studentCount}명 기준` : '등록 학생 없음'}</span>
                       </span>
-                      <span className="font-black text-indigo-600">
-                        평균 {item.avgPercent}% 도달
+                      <span className={item.studentCount > 0 && item.avgPercent > 0 ? 'font-black text-indigo-600' : 'font-medium text-slate-400'}>
+                        {item.studentCount > 0 ? `평균 ${item.avgPercent}% 도달` : '0% 도달'}
                       </span>
                     </div>
                     {activeStudent && (
                       <div className="flex justify-between items-center text-[9px] text-slate-400 pt-0.5">
                         <span>내 완독</span>
-                        <span className={item.myCompleted >= item.avgCompleted ? 'font-bold text-emerald-600' : 'font-medium text-slate-500'}>
+                        <span className={item.myCompleted > 0 && item.myCompleted >= item.avgCompleted ? 'font-bold text-emerald-600' : 'font-medium text-slate-500'}>
                           {item.myCompleted}권 ({item.myPercent}%)
                         </span>
                       </div>
