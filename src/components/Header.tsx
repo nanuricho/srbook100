@@ -52,7 +52,6 @@ export const Header: React.FC<HeaderProps> = ({
   onStudentLogout,
 }) => {
   const currentBadge = getCurrentBadge(completedCount);
-  const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   const handleTeacherDashboardClick = () => {
     if (isTeacherAuthenticated) {
@@ -130,33 +129,10 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Header Quick Stats & Action Buttons */}
-        <div className="flex items-center gap-3 flex-wrap justify-between lg:justify-end">
-          {/* Header Progress Pill */}
-          <div className="bg-slate-100/90 rounded-2xl px-4 py-2.5 flex items-center gap-4 border border-slate-200/60">
-            <div className="text-center">
-              <span className="block text-lg font-black text-indigo-600 leading-none">{completedCount}</span>
-              <span className="text-[10px] uppercase font-extrabold text-slate-400 tracking-wider">완독</span>
-            </div>
-
-            <div className="w-28 sm:w-32">
-              <div className="flex justify-between items-baseline mb-1">
-                <span className="text-[10px] uppercase font-extrabold text-slate-400 tracking-wider">달성률</span>
-                <span className="text-xs font-black text-emerald-600">{percentage}%</span>
-              </div>
-              <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 rounded-full transition-all duration-500"
-                  style={{ width: `${percentage}%` }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onRefreshData}
+        {/* Header Action Buttons */}
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <button
+            onClick={onRefreshData}
               disabled={isSyncing || isLoading}
               title="구글 시트 도서 목록 새로고침"
               className="inline-flex items-center gap-1.5 px-3 py-2.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border-2 border-slate-200 active:bg-slate-100 rounded-xl transition-all disabled:opacity-50 cursor-pointer shadow-xs"
@@ -199,7 +175,6 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
         </div>
-      </div>
 
       {/* Main Navigation Tabs */}
       <div className="flex items-center gap-2 pt-4 overflow-x-auto scrollbar-none">
