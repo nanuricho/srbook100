@@ -8,6 +8,7 @@ import {
   User,
   Sparkles,
 } from 'lucide-react';
+import { createStudentId } from '../utils/studentStorage';
 
 interface BookDetailModalProps {
   book: Book | null;
@@ -93,11 +94,11 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
       return;
     }
 
-    const normNumber = studentNumber ? (studentNumber.includes('번') ? studentNumber : `${studentNumber}번`) : '1번';
-    const normClass = studentClass ? (studentClass.includes('반') ? studentClass : `${studentClass}반`) : '1반';
+    const normNumber = studentNumber ? (studentNumber.includes('번') ? studentNumber.trim() : `${studentNumber.trim()}번`) : '1번';
+    const normClass = studentClass ? (studentClass.includes('반') ? studentClass.trim() : `${studentClass.trim()}반`) : '1반';
 
-    // Find or create student
-    let targetStudent = students.find(
+    // Find or create student by grade, class, name
+    let targetStudent = activeStudent || students.find(
       (s) => s.name === trimmedName && s.grade === studentGrade && s.className === normClass
     ) || students.find((s) => s.name === trimmedName);
 
@@ -114,7 +115,7 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
     };
 
     if (!targetStudent) {
-      const newId = `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(-4)}`;
+      const newId = createStudentId(studentGrade, normClass, normNumber, trimmedName);
       const newSt: Student = {
         id: newId,
         grade: studentGrade,
@@ -128,12 +129,18 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
         updatedAt: nowIso,
       };
       onRegisterStudent(newSt);
+      onSelectStudent(newSt);
     } else {
       const updatedExisting: Student = {
         ...targetStudent,
         grade: studentGrade,
         className: normClass,
         studentNumber: normNumber || targetStudent.studentNumber,
+        records: {
+          ...(targetStudent.records || {}),
+          [book.num]: updatedRecord,
+        },
+        updatedAt: nowIso,
       };
       onSelectStudent(updatedExisting);
       onSaveRecordForStudent(targetStudent.id, updatedRecord);

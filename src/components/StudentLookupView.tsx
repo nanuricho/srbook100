@@ -51,11 +51,19 @@ export function StudentLookupView({
   onDeleteStudent,
   onStudentLogout,
 }: StudentLookupViewProps) {
-  const [searchInput, setSearchInput] = useState<string>('');
-  const [confirmedQuery, setConfirmedQuery] = useState<string>('');
+  const [lookupGrade, setLookupGrade] = useState<string>(currentStudent?.grade || '3학년');
+  const [lookupClass, setLookupClass] = useState<string>(
+    currentStudent?.className ? currentStudent.className.replace('반', '') : '1'
+  );
+  const [lookupNumber, setLookupNumber] = useState<string>(
+    currentStudent?.studentNumber ? currentStudent.studentNumber.replace('번', '') : ''
+  );
+  const [lookupName, setLookupName] = useState<string>(currentStudent?.name || '');
   const [selectedStudentId, setSelectedStudentId] = useState<string>(
     currentStudent ? currentStudent.id : ''
   );
+  const [hasSearched, setHasSearched] = useState<boolean>(false);
+  const [searchedLabel, setSearchedLabel] = useState<string>('');
 
   // New Student Registration Drawer/Inline
   const [isRegistering, setIsRegistering] = useState<boolean>(false);
@@ -68,24 +76,12 @@ export function StudentLookupView({
   useEffect(() => {
     if (currentStudent && !selectedStudentId) {
       setSelectedStudentId(currentStudent.id);
-      setConfirmedQuery(currentStudent.name);
+      setLookupGrade(currentStudent.grade || '3학년');
+      setLookupClass(currentStudent.className ? currentStudent.className.replace('반', '') : '1');
+      setLookupNumber(currentStudent.studentNumber ? currentStudent.studentNumber.replace('번', '') : '');
+      setLookupName(currentStudent.name || '');
     }
   }, [currentStudent]);
-
-  // Search Results: ONLY computed when user confirms/searches with full name
-  const searchResults = useMemo(() => {
-    const q = confirmedQuery.trim().toLowerCase();
-    if (!q) {
-      return [];
-    }
-
-    return students.filter(
-      (s) =>
-        s.name.toLowerCase() === q ||
-        s.name.toLowerCase().includes(q) ||
-        (s.studentNumber && s.studentNumber.includes(q))
-    );
-  }, [students, confirmedQuery]);
 
   // Active target student to display (Only when explicitly selected or confirmed)
   const activeStudent = useMemo(() => {
@@ -156,14 +152,23 @@ export function StudentLookupView({
   // Handle register
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim()) return;
+    const trimmedName = newName.trim();
+    if (!trimmedName) {
+      alert('학생 이름을 입력해주세요.');
+      return;
+    }
+
+    const cleanClass = newClass.trim();
+    const cleanNumber = newNumber.trim();
+    const normClass = cleanClass ? (cleanClass.includes('반') ? cleanClass : `${cleanClass}반`) : '1반';
+    const normNumber = cleanNumber ? (cleanNumber.includes('번') ? cleanNumber : `${cleanNumber}번`) : '1번';
 
     const student: Student = {
-      id: createStudentId(newGrade, newClass, newNumber, newName),
+      id: createStudentId(newGrade, normClass, normNumber, trimmedName),
       grade: newGrade,
-      className: newClass,
-      studentNumber: newNumber,
-      name: newName.trim(),
+      className: normClass,
+      studentNumber: normNumber,
+      name: trimmedName,
       records: {},
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -171,42 +176,81 @@ export function StudentLookupView({
 
     onRegisterStudent(student);
     setSelectedStudentId(student.id);
-    setSearchInput(student.name);
+    onSelectStudent(student);
+    setLookupGrade(newGrade);
+    setLookupClass(normClass.replace('반', ''));
+    setLookupNumber(normNumber.replace('번', ''));
+    setLookupName(trimmedName);
+    setHasSearched(true);
+    setSearchedLabel(`${newGrade} ${normClass} ${normNumber} ${trimmedName}`);
     setIsRegistering(false);
     setNewName('');
   };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const query = searchInput.trim();
-    if (!query) {
-      setConfirmedQuery('');
-      setSelectedStudentId('');
+    const cleanClass = lookupClass.trim();
+    const cleanNumber = lookupNumber.trim();
+    const cleanName = lookupName.trim();
+
+    if (!cleanName && !cleanClass && !cleanNumber) {
+      alert('조회할 학생 이름 또는 반·번호를 입력해주세요.');
       return;
     }
 
-    setConfirmedQuery(query);
+    const normClass = cleanClass ? (cleanClass.includes('반') ? cleanClass : `${cleanClass}반`) : '';
+    const normNumber = cleanNumber ? (cleanNumber.includes('번') ? cleanNumber : `${cleanNumber}번`) : '';
+    const label = cleanName ? `'${cleanName}'` : `${lookupGrade} ${normClass} ${normNumber}`;
 
-    // Exact matches
-    const exactMatches = students.filter(
-      (s) => s.name.toLowerCase() === query.toLowerCase()
-    );
+    setSearchedLabel(label);
+    setHasSearched(true);
 
-    if (exactMatches.length === 1) {
-      setSelectedStudentId(exactMatches[0].id);
-    } else if (exactMatches.length > 1) {
-      setSelectedStudentId('');
-    } else {
-      // Partial matches
-      const partialMatches = students.filter(
-        (s) => s.name.toLowerCase().includes(query.toLowerCase())
+    let found: Student | undefined;
+    if (cleanName) {
+      found =
+        students.find((s) => s.name === cleanName && s.grade === lookupGrade) ||
+        students.find((s) => s.name === cleanName) ||
+        (normClass && normNumber
+          ? students.find(
+              (s) => s.grade === lookupGrade && s.className === normClass && s.studentNumber === normNumber
+            )
+          : undefined);
+    } else if (normClass && normNumber) {
+      found = students.find(
+        (s) => s.grade === lookupGrade && s.className === normClass && s.studentNumber === normNumber
       );
-      if (partialMatches.length === 1) {
-        setSelectedStudentId(partialMatches[0].id);
-      } else {
-        setSelectedStudentId('');
-      }
     }
+
+    if (found) {
+      setSelectedStudentId(found.id);
+      onSelectStudent(found);
+    } else {
+      setSelectedStudentId('');
+    }
+  };
+
+  const handleQuickCreateAndOpen = () => {
+    const cleanClass = lookupClass.trim();
+    const cleanNumber = lookupNumber.trim();
+    const cleanName = lookupName.trim();
+    const normClass = cleanClass ? (cleanClass.includes('반') ? cleanClass : `${cleanClass}반`) : '1반';
+    const normNumber = cleanNumber ? (cleanNumber.includes('번') ? cleanNumber : `${cleanNumber}번`) : '1번';
+    const displayName = cleanName || `${normClass} ${normNumber}`;
+
+    const newStudent: Student = {
+      id: createStudentId(lookupGrade, normClass, normNumber, displayName),
+      grade: lookupGrade,
+      className: normClass,
+      studentNumber: normNumber,
+      name: displayName,
+      records: {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    onRegisterStudent(newStudent);
+    setSelectedStudentId(newStudent.id);
+    onSelectStudent(newStudent);
   };
 
   return (
@@ -223,7 +267,7 @@ export function StudentLookupView({
               🔍 내 이름으로 독서기록 조회하기
             </h2>
             <p className="text-sm text-indigo-100 mt-1 max-w-xl">
-              이름을 입력하면 내가 지금까지 완독한 책 목록, 달성률, 한 줄 소감과 인증서를 바로 확인할 수 있습니다.
+              이름이나 학년 · 반 · 번호를 입력하면 지금까지 완독한 책 목록, 한 줄 소감과 인증서를 바로 확인할 수 있습니다.
             </p>
           </div>
 
@@ -325,128 +369,111 @@ export function StudentLookupView({
 
       {/* Search Bar Section */}
       <div className="bg-white rounded-3xl p-5 md:p-6 border border-slate-100 shadow-card">
-        <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row items-center gap-3">
-          <div className="relative flex-1 w-full">
-            <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-indigo-500" />
-            <input
-              type="text"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="내 이름을 입력하세요 (예: 김민준)"
-              className="w-full pl-12 pr-10 py-3.5 bg-slate-50 border-2 border-slate-200 focus:border-indigo-600 focus:bg-white focus:outline-hidden rounded-2xl text-sm font-bold text-slate-900 transition-all placeholder:text-slate-400 shadow-inner"
-              autoFocus
-            />
-            {searchInput && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchInput('');
-                  setConfirmedQuery('');
-                  setSelectedStudentId('');
-                }}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
+        <form onSubmit={handleSearchSubmit} className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black text-slate-700 flex items-center gap-1.5">
+              <Search className="w-4 h-4 text-indigo-600" />
+              <span>조회할 학생 이름 또는 학년 · 반 · 번호를 입력하세요:</span>
+            </span>
+            {currentStudent && (
+              <span className="text-xs font-extrabold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-100">
+                현재 접속: {currentStudent.grade} {currentStudent.className} {currentStudent.studentNumber || ''} {currentStudent.name}
+              </span>
             )}
           </div>
 
-          <button
-            type="submit"
-            className="w-full sm:w-auto px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-2xl text-sm font-black transition-all cursor-pointer shadow-md shadow-indigo-200 flex items-center justify-center gap-2 shrink-0"
-          >
-            <Search className="w-4 h-4" />
-            <span>내 기록 조회하기</span>
-          </button>
-
-          {currentStudent && (
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedStudentId(currentStudent.id);
-                  setConfirmedQuery(currentStudent.name);
-                  setSearchInput(currentStudent.name);
-                }}
-                className="flex-1 sm:flex-initial px-4 py-3.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 shadow-2xs"
+          <div className="grid grid-cols-12 gap-2.5 items-end">
+            <div className="col-span-6 sm:col-span-2">
+              <label className="block text-[11px] font-extrabold text-slate-500 mb-1">학년</label>
+              <select
+                value={lookupGrade}
+                onChange={(e) => setLookupGrade(e.target.value)}
+                className="w-full px-3 py-3 bg-slate-50 border-2 border-slate-200 focus:border-indigo-600 focus:bg-white rounded-2xl text-xs font-bold text-slate-900 focus:outline-hidden"
               >
-                <UserCheck className="w-4 h-4 text-indigo-600" />
-                <span>접속 중: {currentStudent.name}</span>
+                {['1학년', '2학년', '3학년', '4학년', '5학년', '6학년'].map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="col-span-3 sm:col-span-2">
+              <label className="block text-[11px] font-extrabold text-slate-500 mb-1">반</label>
+              <input
+                type="text"
+                value={lookupClass}
+                onChange={(e) => setLookupClass(e.target.value)}
+                placeholder="1반"
+                className="w-full px-3.5 py-3 bg-slate-50 border-2 border-slate-200 focus:border-indigo-600 focus:bg-white rounded-2xl text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:outline-hidden"
+              />
+            </div>
+
+            <div className="col-span-3 sm:col-span-2">
+              <label className="block text-[11px] font-extrabold text-slate-500 mb-1">번호</label>
+              <input
+                type="text"
+                value={lookupNumber}
+                onChange={(e) => setLookupNumber(e.target.value)}
+                placeholder="15번"
+                className="w-full px-3.5 py-3 bg-slate-50 border-2 border-slate-200 focus:border-indigo-600 focus:bg-white rounded-2xl text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:outline-hidden"
+              />
+            </div>
+
+            <div className="col-span-8 sm:col-span-3">
+              <label className="block text-[11px] font-extrabold text-slate-500 mb-1">학생 이름 (선택/직접검색)</label>
+              <input
+                type="text"
+                value={lookupName}
+                onChange={(e) => setLookupName(e.target.value)}
+                placeholder="이름 (예: 김민준)"
+                className="w-full px-3.5 py-3 bg-slate-50 border-2 border-indigo-200 focus:border-indigo-600 focus:bg-white rounded-2xl text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:outline-hidden"
+              />
+            </div>
+
+            <div className="col-span-4 sm:col-span-3 flex items-center gap-2">
+              <button
+                type="submit"
+                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-2xl text-xs font-black transition-all cursor-pointer shadow-md shadow-indigo-200 flex items-center justify-center gap-1.5"
+              >
+                <Search className="w-4 h-4" />
+                <span>조회하기</span>
               </button>
-              {onStudentLogout && (
+
+              {currentStudent && onStudentLogout && (
                 <button
                   type="button"
                   onClick={() => {
-                    setSearchInput('');
-                    setConfirmedQuery('');
                     setSelectedStudentId('');
+                    setHasSearched(false);
                     onStudentLogout();
                   }}
-                  className="px-3.5 py-3.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 shrink-0 shadow-2xs"
+                  className="px-3 py-3 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center justify-center shrink-0 shadow-2xs"
                   title="조회 종료 및 학생 나가기"
                 >
                   <LogOut className="w-4 h-4 text-rose-600" />
-                  <span>나가기</span>
                 </button>
               )}
             </div>
-          )}
+          </div>
         </form>
 
-        {/* If multiple students match the confirmed name */}
-        {confirmedQuery.trim() && searchResults.length > 1 && (
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <p className="text-xs font-bold text-slate-600 mb-2">
-              '{confirmedQuery.trim()}' 이름으로 {searchResults.length}명의 학생이 검색되었습니다. 본인의 학년/반을 선택해주세요:
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {searchResults.map((s) => {
-                const isSelected = activeStudent?.id === s.id;
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedStudentId(s.id);
-                    }}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer border ${
-                      isSelected
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                        : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200'
-                    }`}
-                  >
-                    <span>{s.name}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                      {s.grade} {s.className} {s.studentNumber}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* If 0 students match the confirmed name */}
-        {confirmedQuery.trim() && searchResults.length === 0 && (
-          <div className="mt-4 p-4 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+        {/* If 0 students match the searched grade/class/number/name */}
+        {hasSearched && !activeStudent && (
+          <div className="mt-4 p-4 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row items-center justify-between gap-3 animate-fadeIn">
             <div className="text-center sm:text-left">
               <p className="text-xs font-bold text-amber-900">
-                '{confirmedQuery.trim()}' 이름으로 등록된 학생 정보가 없습니다.
+                {searchedLabel} 등록된 독서 기록이 없습니다.
               </p>
               <p className="text-[11px] text-amber-700 mt-0.5">
-                이름을 정확하게 입력하셨는지 확인하시거나, 새 학생으로 바로 등록하여 독서 기록을 시작할 수 있습니다.
+                해당 학생 이름/번호로 새 독서 기록을 바로 시작하여 완독 도서를 기록해보세요.
               </p>
             </div>
             <button
               type="button"
-              onClick={() => {
-                setNewName(confirmedQuery.trim());
-                setIsRegistering(true);
-              }}
+              onClick={handleQuickCreateAndOpen}
               className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 shadow-xs"
             >
               <UserPlus className="w-3.5 h-3.5" />
-              <span>'{confirmedQuery.trim()}' 학생 새로 등록하기</span>
+              <span>{searchedLabel} 새 독서 기록 시작하기</span>
             </button>
           </div>
         )}
@@ -464,7 +491,7 @@ export function StudentLookupView({
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="px-3 py-0.5 rounded-full text-xs font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                    {activeStudent.grade} {activeStudent.className} {activeStudent.studentNumber}
+                    {activeStudent.grade} {activeStudent.className} {activeStudent.studentNumber || ''}
                   </span>
                   {studentStats.badge && (
                     <span
@@ -510,13 +537,12 @@ export function StudentLookupView({
               <button
                 type="button"
                 onClick={() => {
-                  setSearchInput('');
-                  setConfirmedQuery('');
                   setSelectedStudentId('');
+                  setHasSearched(false);
                   onStudentLogout?.();
                 }}
                 className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border-2 border-rose-200 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                title="독서기록 조회 종료 및 이름 숨기기"
+                title="독서기록 조회 종료 및 학생 나가기"
               >
                 <LogOut className="w-4 h-4 text-rose-600" />
                 <span>조회 종료 (나가기)</span>
@@ -527,13 +553,12 @@ export function StudentLookupView({
                   onClick={() => {
                     if (
                       confirm(
-                        `'${activeStudent.name}' 학생의 모든 독서 기록과 명단을 삭제하시겠습니까?`
+                        `'${activeStudent.grade} ${activeStudent.className} ${activeStudent.studentNumber || ''}' 학생의 모든 독서 기록을 삭제하시겠습니까?`
                       )
                     ) {
                       onDeleteStudent(activeStudent.id, activeStudent.name);
                       setSelectedStudentId('');
-                      setConfirmedQuery('');
-                      setSearchInput('');
+                      setHasSearched(false);
                     }
                   }}
                   title="학생 명단 및 기록 삭제"
@@ -555,9 +580,6 @@ export function StudentLookupView({
                 <h3 className="text-lg font-black text-slate-900 mt-0.5">
                   총 {studentStats.total}권 중 <strong className="text-indigo-600">{studentStats.completed}권</strong> 완독 완료!
                 </h3>
-              </div>
-              <div className="text-right">
-                <span className="text-2xl font-black text-indigo-600">{studentStats.percentage}%</span>
               </div>
             </div>
 
@@ -697,10 +719,10 @@ export function StudentLookupView({
           </div>
           <div>
             <h3 className="text-lg font-black text-slate-900">
-              위 검색창에 이름을 입력해주세요
+              학년 · 반 · 번호로 내 독서기록을 조회해보세요
             </h3>
             <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-              본인의 이름을 입력하면 개인 독서 통계, 완독한 100선 필독도서 목록과 한 줄 소감, 완독 인증서를 안전하게 확인할 수 있습니다.
+              본인의 학년, 반, 번호를 입력하면 개인 독서 통계, 완독한 100선 필독도서 목록과 한 줄 소감, 완독 인증서를 바로 확인할 수 있습니다.
             </p>
           </div>
         </div>

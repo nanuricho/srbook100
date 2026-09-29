@@ -24,8 +24,6 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
     day: 'numeric',
   });
 
-  const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
-
   const handlePrint = () => {
     window.print();
   };
@@ -78,9 +76,15 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
               <p className="text-sm font-medium text-amber-900">
                 소속: <span className="font-bold">{studentGradeClass || '서룡초등학교'}</span>
               </p>
-              <p className="text-xl font-extrabold text-slate-900 mt-1">
-                성명: {studentName || '학생'}
-              </p>
+              {studentName && !studentName.includes('반') && !studentName.includes('번') ? (
+                <p className="text-xl font-extrabold text-slate-900 mt-1">
+                  성명: {studentName}
+                </p>
+              ) : (
+                <p className="text-xl font-extrabold text-slate-900 mt-1">
+                  학생: {studentGradeClass || studentName || '서룡초등학교 학생'}
+                </p>
+              )}
             </div>
 
             {/* Citation Statement */}
@@ -90,11 +94,7 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
                 <strong className="text-indigo-700 text-lg underline font-extrabold">
                   {completedCount}권
                 </strong>
-                의 책을 완독하고 달성률{' '}
-                <strong className="text-emerald-700 text-lg underline font-extrabold">
-                  {percentage}%
-                </strong>
-                를 기록하며 훌륭한 독서 태도를 발휘하였기에 이 인증서를 수여합니다.
+                의 책을 성실히 완독하고 훌륭한 독서 태도를 발휘하였기에 이 인증서를 수여합니다.
               </p>
 
               {currentBadge && (

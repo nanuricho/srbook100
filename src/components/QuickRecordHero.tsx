@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { BookRatingStat, calculateBookRatingStats, getTopRatedBooks } from '../utils/rankingUtils';
 import { BookReviewsModal } from './BookReviewsModal';
+import { createStudentId } from '../utils/studentStorage';
 
 interface QuickRecordHeroProps {
   books: Book[];
@@ -100,8 +101,8 @@ export function QuickRecordHero({
       return;
     }
 
-    const normClass = inputClass ? (inputClass.includes('반') ? inputClass : `${inputClass}반`) : '1반';
-    const normNumber = inputNumber ? (inputNumber.includes('번') ? inputNumber : `${inputNumber}번`) : '1번';
+    const normClass = inputClass ? (inputClass.includes('반') ? inputClass.trim() : `${inputClass.trim()}반`) : '1반';
+    const normNumber = inputNumber ? (inputNumber.includes('번') ? inputNumber.trim() : `${inputNumber.trim()}번`) : '1번';
 
     // Find existing student
     const existing = students.find(
@@ -117,7 +118,7 @@ export function QuickRecordHero({
       };
       onSelectStudent(updated);
     } else if (onRegisterStudent) {
-      const newId = `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(-4)}`;
+      const newId = createStudentId(inputGrade, normClass, normNumber, trimmedName);
       const newStudent: Student = {
         id: newId,
         grade: inputGrade,

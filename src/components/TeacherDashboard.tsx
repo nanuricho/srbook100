@@ -316,14 +316,14 @@ export function TeacherDashboard({
   // Single Student Add
   const handleAddSingleStudent = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!singleName.trim()) return;
+    const finalName = singleName.trim() || `${singleClass} ${singleNumber}`;
 
     const newStudent: Student = {
-      id: createStudentId(singleGrade, singleClass, singleNumber, singleName),
+      id: createStudentId(singleGrade, singleClass, singleNumber, finalName),
       grade: singleGrade,
       className: singleClass,
       studentNumber: singleNumber,
-      name: singleName.trim(),
+      name: finalName,
       records: {},
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -1235,13 +1235,12 @@ export function TeacherDashboard({
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-extrabold text-slate-600 mb-1">이름 *</label>
+                  <label className="block text-[11px] font-extrabold text-slate-600 mb-1">이름 (선택)</label>
                   <input
                     type="text"
-                    required
                     value={singleName}
                     onChange={(e) => setSingleName(e.target.value)}
-                    placeholder="김민준"
+                    placeholder="선택 사항 (미입력 시 반/번호)"
                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
                   />
                 </div>
