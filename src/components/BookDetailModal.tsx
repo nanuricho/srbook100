@@ -7,8 +7,10 @@ import {
   Trash2,
   User,
   Sparkles,
+  CheckCircle2,
 } from 'lucide-react';
 import { createStudentId } from '../utils/studentStorage';
+import { triggerCelebrationConfetti } from '../utils/confetti';
 
 interface BookDetailModalProps {
   book: Book | null;
@@ -145,6 +147,9 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
       onSelectStudent(updatedExisting);
       onSaveRecordForStudent(targetStudent.id, updatedRecord);
     }
+
+    // Trigger celebration confetti animation
+    triggerCelebrationConfetti();
 
     onClose();
   };
@@ -336,10 +341,10 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
               </button>
               <button
                 type="submit"
-                className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 active:from-amber-600 text-indigo-950 text-xs font-black rounded-xl shadow-md transition-all inline-flex items-center gap-1.5 cursor-pointer"
+                className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 active:from-emerald-800 text-white text-xs font-black rounded-xl shadow-md hover:shadow-lg transition-all inline-flex items-center gap-1.5 cursor-pointer ring-2 ring-emerald-300/40"
               >
-                <Save className="w-4 h-4" />
-                <span>독서기록 저장하기</span>
+                <CheckCircle2 className="w-4 h-4 text-white" />
+                <span>완독 완료</span>
               </button>
             </div>
           </div>

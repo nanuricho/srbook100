@@ -34,6 +34,7 @@ import {
   sendRecordToGoogleSheet,
   getFormattedNow,
 } from './utils/googleAppsScriptSync';
+import { triggerCelebrationConfetti } from './utils/confetti';
 import {
   ensureAnonymousAuth,
   subscribeToStudentsFromCloud,
@@ -341,6 +342,9 @@ export default function App() {
     };
 
     updateActiveStudentRecords(updatedRecords);
+    if (nextStatus === 'COMPLETED') {
+      triggerCelebrationConfetti();
+    }
     showToast(
       nextStatus === 'COMPLETED'
         ? `[${activeStudent.name}] No.${num} 도서를 완독 처리했습니다! 🎉`

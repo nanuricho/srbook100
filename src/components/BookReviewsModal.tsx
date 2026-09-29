@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookRatingStat } from '../utils/rankingUtils';
+import { BookRatingStat, maskStudentName } from '../utils/rankingUtils';
 import { X, Star, BookOpen, MessageSquare, Users, CheckCircle2 } from 'lucide-react';
 
 interface BookReviewsModalProps {
@@ -114,7 +114,7 @@ export const BookReviewsModal: React.FC<BookReviewsModalProps> = ({ stat, onClos
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-xs text-slate-900">
-                        {rev.studentName}
+                        {maskStudentName(rev.studentName)}
                       </span>
                       <span className="text-[10px] text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200">
                         {rev.studentGrade}

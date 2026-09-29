@@ -21,6 +21,17 @@ export interface BookRatingStat {
 }
 
 /**
+ * Mask student name for public privacy protection (e.g. 김민준 -> 김**, 이준 -> 이*, 남궁민수 -> 남***)
+ */
+export function maskStudentName(name?: string): string {
+  if (!name || !name.trim()) return '학생';
+  const clean = name.trim();
+  if (clean.length === 1) return `${clean}*`;
+  if (clean.length === 2) return `${clean[0]}*`;
+  return `${clean[0]}${'*'.repeat(clean.length - 1)}`;
+}
+
+/**
  * Calculate book ratings and popularity from all students' records
  */
 export function calculateBookRatingStats(books: Book[], students: Student[]): BookRatingStat[] {
@@ -65,7 +76,7 @@ export function calculateBookRatingStats(books: Book[], students: Student[]): Bo
 
       if (rec.review && rec.review.trim()) {
         item.reviews.push({
-          studentName: student.name,
+          studentName: maskStudentName(student.name),
           studentGrade: `${student.grade} ${student.className}`,
           rating: rec.rating,
           review: rec.review.trim(),
